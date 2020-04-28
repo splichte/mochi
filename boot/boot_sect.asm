@@ -28,10 +28,12 @@ load_kernel:
     call print_string
 
     mov bx, KERNEL_OFFSET
-    mov dh, 1                   ; we have to be careful to not
+    mov dh, 12                  ; we have to be careful to not
                                 ; load too many sectors. the disk 
                                 ; read fails if we do. any way 
                                 ; to pad extra sectors? 
+                                ; Update: I called dd in the Makefile
+                                ; to pad to 12 sectors. 
     mov dl, [BOOT_DRIVE]
     call disk_load
 

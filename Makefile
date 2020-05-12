@@ -14,17 +14,18 @@ run: all
 os_image: boot/boot_sect.bin kernel.bin
 	cat $^ > os_image && dd if=/dev/zero count=120 >> os_image 2>/dev/null
 
-kernel.bin: kernel/kernel_entry.o ${OBJ}
+# "-Ttext 0x1000" must match KERNEL_ENTRY in boot/boot_sect.asm
+kernel.bin: kernel/kernel_entry.o kernel/idt.o ${OBJ}
 	i386-elf-ld -Ttext 0x1000 --oformat binary $^ -o $@
 
 %.o : %.c ${HEADERS}
-	i386-elf-gcc -ffreestanding -c $< -o $@
+	i386-elf-gcc -mgeneral-regs-only -ffreestanding -c $< -o $@
 
 # boot_sect.bin
 %.bin : %.asm
 	nasm $< -f bin -o $@
 
-# kernel_entry.o
+# kernel_entry.o, idt.o
 %.o: %.asm
 	nasm $< -f elf -o $@
 

@@ -1,5 +1,5 @@
 #include "screen.h"
-#include "../kernel/low_level.h"
+#include "../kernel/hardware.h"
 
 /* forward declarations */
 int get_screen_offset(int col, int row);

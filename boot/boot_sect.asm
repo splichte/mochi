@@ -1,4 +1,5 @@
 ; boots a C kernel in 32-bit protected mode
+; most of this is from Nick Blundell's book.
 [org 0x7c00]
 KERNEL_OFFSET equ 0x1000    ; memory offset where we'll load kernel
 

@@ -151,8 +151,6 @@ void interrupt_function(struct interrupt_frame *frame, uint32_t error_code) {
     asm volatile ("sti");
 }
 
-extern void idt_load(uint32_t);
-
 // see [2], Ch. 9 - "Exceptions and Interrupts"
 // the IDT has 256 total entries. Our PIC-defined 
 // entries start at entry 32 (0-indexed)
@@ -187,8 +185,7 @@ void setup_interrupt_descriptor_table() {
     idtr.idt_base = (uint32_t) idt;
     idtr.idt_limit = sizeof (idt) - 1;
 
-    // assembly
-    idt_load((uint32_t) &idtr); 
+    asm volatile ("lidt (%0)" : : "r" (&idtr));
 
     asm volatile ("sti");
 }

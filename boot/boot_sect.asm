@@ -29,7 +29,7 @@ load_kernel:
     call print_string
 
     mov bx, KERNEL_OFFSET
-    mov dh, 12                  ; we have to be careful to not
+    mov dh, 40                 ; we have to be careful to not
                                 ; load too many sectors. the disk 
                                 ; read fails if we do. any way 
                                 ; to pad extra sectors? 

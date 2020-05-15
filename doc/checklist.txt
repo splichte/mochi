@@ -1,0 +1,17 @@
+next work for kernel:
+    - getting the screen to handle backspace/etc. appropriately
+      (basically an echo terminal.)
+    - move a bit of stuff out of “kernel.c”
+
+steps after (in no particular order):
+    - filesystem
+    - processes + PIT; threading
+    - virtual memory
+    - networking
+    - libc (to compile a small C compiler + programs written for Linux, hopefully!)
+    - testing on real 64bit hardware, like a laptop.
+    - vi text editor
+
+done:
+    ✓ getting all the keys to work
+    ✓ document everything that's happened so far, and what I learned

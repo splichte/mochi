@@ -1,6 +1,14 @@
 #include "screen.h"
 #include "../kernel/hardware.h"
 
+#define VIDEO_ADDRESS 0xb8000
+#define MAX_ROWS 25
+#define MAX_COLS 80
+#define WHITE_ON_BLACK 0x0f
+
+#define REG_SCREEN_CTRL 0x3d4
+#define REG_SCREEN_DATA 0x3d5
+
 /* forward declarations */
 int get_screen_offset(int col, int row);
 int get_cursor();
@@ -13,7 +21,7 @@ void print(char *message) {
 void print_at(char *message, int col, int row) {
     if (col >= 0 && row >= 0) {
         set_cursor(get_screen_offset(col, row));
-    } 
+    }
 
     int i = 0;
     while (message[i] != 0) {
@@ -92,3 +100,46 @@ void clear_screen() {
 
     set_cursor(get_screen_offset(0, 0));
 }
+
+
+// print 0 to 256, in decimal
+// TODO: I'm sure there's a better way to do this. 
+void print_byte(uint8_t i) {
+    // max value of 256
+    char s[5];
+    s[4] = '\0';
+    s[3] = '\n';
+
+    int hundreds_place = (i / 100);
+    s[0] = hundreds_place + '0';
+
+    int tens_place = (i - (hundreds_place * 100)) / 10;
+    s[1] = tens_place + '0';
+
+    int ones_place = i - (hundreds_place * 100) - (tens_place * 10);
+    s[2] = ones_place + '0';
+
+    print(s);
+}
+
+/* print word as hex */
+void print_word(uint32_t word) {
+    // 4 bytes = 8 hex digits + 0x
+    char s[12];
+    s[11] = '\0';
+    s[10] = '\n';
+    s[1] = 'x';
+    s[0] = '0';
+
+    for (int i = 0; i < 8; i++) {
+        int ws = (word >> (i * 8)) & 0xF;
+        if (ws >= 0 && ws < 10) {
+            s[9 - i] = '0' + ws;
+        } else {
+            s[9 - i] = 'a' + (ws - 10);
+        }
+    }
+    print(s);
+}
+
+

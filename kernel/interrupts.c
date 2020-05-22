@@ -9,6 +9,7 @@
 #include "hardware.h"
 #include "interrupts.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 // definitions for PIC controllers. see [1]
 #define PIC1A   0x20
@@ -143,6 +144,221 @@ void finish_scancode_init() {
 }
 
 
+/* start network stuff. from ToaruOS.
+ *
+ * I don't know what any of this means.
+ */
+
+#define E1000_NUM_RX_DESC 32
+#define E1000_NUM_TX_DESC 8
+
+struct rx_desc {
+    volatile uint64_t addr;
+    volatile uint16_t length;
+    volatile uint16_t checksum;
+    volatile uint8_t status;
+    volatile uint8_t errors;
+    volatile uint16_t special;
+} __attribute__((packed)); 
+
+struct tx_desc {
+    volatile uint64_t addr;
+    volatile uint16_t length;
+    volatile uint8_t cso;
+    volatile uint8_t cmd;
+    volatile uint8_t status;
+    volatile uint8_t css;
+    volatile uint16_t special;
+} __attribute__((packed));
+
+// I renamed these from ToaruOS just because...I 
+// can read them easier?
+#define E1000_CTRL_REGISTER             0x0000
+#define E1000_STATUS_REGISTER           0x0008
+#define E1000_EEPROM_REGISTER           0x0014
+#define E1000_CTRL_EXT_REGISTER         0x0018
+
+#define E1000_RCTRL_REGISTER            0x0100
+#define E1000_RX_DESC_LOW_REGISTER      0x2800
+#define E1000_RX_DESC_HIGH_REGISTER     0x2804
+#define E1000_RX_DESC_LEN_REGISTER      0x2808
+#define E1000_RX_DESC_HEAD_REGISTER     0x2810
+#define E1000_RX_DESC_TAIL_REGISTER     0x2818
+
+#define E1000_TCTRL_REGISTER            0x0400
+#define E1000_TX_DESC_LOW_REGISTER      0x3800
+#define E1000_TX_DESC_HIGH_REGISTER     0x3804
+#define E1000_TX_DESC_LEN_REGISTER      0x3810
+#define E1000_TX_DESC_TAIL_REGISTER     0x3818
+
+#define E1000_RX_ADDR_REGISTER          0x5400
+
+/* Straight up copied from ToaruOS. */
+#define RCTL_EN                         (1 << 1)    /* Receiver Enable */
+#define RCTL_SBP                        (1 << 2)    /* Store Bad Packets */
+#define RCTL_UPE                        (1 << 3)    /* Unicast Promiscuous Enabled */
+#define RCTL_MPE                        (1 << 4)    /* Multicast Promiscuous Enabled */
+#define RCTL_LPE                        (1 << 5)    /* Long Packet Reception Enable */
+#define RCTL_LBM_NONE                   (0 << 6)    /* No Loopback */
+#define RCTL_LBM_PHY                    (3 << 6)    /* PHY or external SerDesc loopback */
+#define RCTL_RDMTS_HALF                 (0 << 8)    /* Free Buffer Threshold is 1/2 of RDLEN */
+#define RCTL_RDMTS_QUARTER              (1 << 8)    /* Free Buffer Threshold is 1/4 of RDLEN */
+#define RCTL_RDMTS_EIGHTH               (2 << 8)    /* Free Buffer Threshold is 1/8 of RDLEN */
+#define RCTL_MO_36                      (0 << 12)   /* Multicast Offset - bits 47:36 */
+#define RCTL_MO_35                      (1 << 12)   /* Multicast Offset - bits 46:35 */
+#define RCTL_MO_34                      (2 << 12)   /* Multicast Offset - bits 45:34 */
+#define RCTL_MO_32                      (3 << 12)   /* Multicast Offset - bits 43:32 */
+#define RCTL_BAM                        (1 << 15)   /* Broadcast Accept Mode */
+#define RCTL_VFE                        (1 << 18)   /* VLAN Filter Enable */
+#define RCTL_CFIEN                      (1 << 19)   /* Canonical Form Indicator Enable */
+#define RCTL_CFI                        (1 << 20)   /* Canonical Form Indicator Bit Value */
+#define RCTL_DPF                        (1 << 22)   /* Discard Pause Frames */
+#define RCTL_PMCF                       (1 << 23)   /* Pass MAC Control Frames */
+#define RCTL_SECRC                      (1 << 26)   /* Strip Ethernet CRC */
+
+#define RCTL_BSIZE_256                  (3 << 16)
+#define RCTL_BSIZE_512                  (2 << 16)
+#define RCTL_BSIZE_1024                 (1 << 16)
+#define RCTL_BSIZE_2048                 (0 << 16)
+#define RCTL_BSIZE_4096                 ((3 << 16) | (1 << 25))
+#define RCTL_BSIZE_8192                 ((2 << 16) | (1 << 25))
+#define RCTL_BSIZE_16384                ((1 << 16) | (1 << 25))
+
+#define TCTL_EN                         (1 << 1)    /* Transmit Enable */
+#define TCTL_PSP                        (1 << 3)    /* Pad Short Packets */
+#define TCTL_CT_SHIFT                   4           /* Collision Threshold */
+#define TCTL_COLD_SHIFT                 12          /* Collision Distance */
+#define TCTL_SWXOFF                     (1 << 22)   /* Software XOFF Transmission */
+#define TCTL_RTLC                       (1 << 24)   /* Re-transmit on Late Collision */
+
+#define CMD_EOP                         (1 << 0)    /* End of Packet */
+#define CMD_IFCS                        (1 << 1)    /* Insert FCS */
+#define CMD_IC                          (1 << 2)    /* Insert Checksum */
+#define CMD_RS                          (1 << 3)    /* Report Status */
+#define CMD_RPS                         (1 << 4)    /* Report Packet Sent */
+#define CMD_VLE                         (1 << 6)    /* VLAN Packet Enable */
+#define CMD_IDE                         (1 << 7)    /* Interrupt Delay Enable */
+
+
+#define PCI_ADDR_PORT           0xcf8
+#define PCI_VALUE_PORT          0xcfc
+
+// offsets into the PCI header structure. 
+// reminder that the PCI header is little-endian. 
+#define PCI_VENDOR_ID           0x00
+#define PCI_DEVICE_ID           0x02
+
+#define PCI_SUBCLASS            0x0a
+#define PCI_CLASS_CODE          0x0b
+
+#define PCI_INTERRUPT_LINE      0x3c
+
+
+typedef struct {
+    uint16_t bus;
+    uint8_t device;
+    uint8_t function;
+} pci_bdf;
+
+// do these addresses just exist in memory, or do I have to 
+// explicitly call port byte out/etc?
+
+// address of the header for this BDF addr in pci configuration space
+//
+// 0xfc because bits 1-0 must be zero. (see https://wiki.osdev.org/PCI#PCI_Device_Structure)
+//
+uint32_t pci_get_addr(pci_bdf bdf, uint8_t offset) {
+    return 0x80000000 | (bdf.bus << 16) | (bdf.device << 11) | (bdf.function << 8) | (offset & 0xfc);
+}
+
+uint16_t pci_get_vendor_id(pci_bdf bdf) {
+    uint32_t addr = pci_get_addr(bdf, 0x00);
+    port_dword_out(PCI_ADDR_PORT, addr);
+
+    uint32_t word = port_dword_in(PCI_VALUE_PORT);
+
+    return word & 0xffff;
+//    return ((word & 0xff) << 8) | ((word >> 8) & 0xff);
+}
+
+uint8_t pci_get_class_code(pci_bdf bdf) {
+    uint32_t addr = pci_get_addr(bdf, 0x08);
+    port_dword_out(PCI_ADDR_PORT, addr);
+
+    uint32_t word = port_dword_in(PCI_VALUE_PORT);
+
+    return (word >> 24) & 0xff;
+}
+
+uint8_t pci_get_subclass(pci_bdf bdf) {
+    uint32_t addr = pci_get_addr(bdf, 0x08);
+    port_dword_out(PCI_ADDR_PORT, addr);
+
+    uint32_t word = port_dword_in(PCI_VALUE_PORT);
+
+    return (word >> 16) & 0xff;
+}
+
+uint8_t pci_get_interrupt_line(pci_bdf bdf) {
+    uint32_t addr = pci_get_addr(bdf, 0x3c);
+    port_dword_out(PCI_ADDR_PORT, addr);
+
+    uint32_t word = port_dword_in(PCI_VALUE_PORT);
+
+    return ((word & 0xff) + 0x20); // 0x20 is the pic offset.
+}
+
+
+// stdbool?
+bool is_ethernet(pci_bdf target) {
+    uint16_t vendor_id = pci_get_vendor_id(target);
+
+    if (vendor_id == 0xffff) { // device doesn't exist
+        return false;
+    }
+
+    if (vendor_id != 0x8086) { // intel
+        return false;
+    }
+
+    uint8_t class_code = pci_get_class_code(target);
+    uint8_t subclass = pci_get_subclass(target);
+
+    // 0x02 = network; 0x00 = ethernet
+    if (class_code != 0x02 | subclass != 0x00) {
+        return false;
+    }
+
+    return true;
+}
+
+pci_bdf get_ethernet_bdf() {
+    for (uint16_t bus = 0; bus < 256; bus++) {
+        for (uint8_t device = 0; device < 32; device++) {
+            pci_bdf target = { bus, device, 0 };
+            if (is_ethernet(target)) {
+                return target;
+            }
+        }
+    }
+
+    pci_bdf bad = { -1, -1, -1 };
+    return bad;
+}
+
+int get_e1000_interrupt() {
+    pci_bdf ethernet = get_ethernet_bdf();
+    if (ethernet.bus == -1) {
+        return -1;
+    }
+
+    return pci_get_interrupt_line(ethernet);
+}
+
+
+ /* end network stuff
+ */
+
 
 // definitions for the Interrupt Descriptor Table (IDT)
 // see [2]. the table is composed of "gates" 
@@ -180,8 +396,8 @@ void setup_interrupt_controller() {
     // ToaruOS does 0x10 | 0x01. i.e. uses edge-triggered, 
     // not level-triggered. PS/2 manual says to use 
     // level-triggered?
-    port_byte_out(PIC1A, 0x10 | 0x01);
-    port_byte_out(PIC2A, 0x10 | 0x01);
+    port_byte_out(PIC1A, 0x10 | 0x9);
+    port_byte_out(PIC2A, 0x10 | 0x9);
 
     // Initialization Command Byte 2
     // offset by 32 to the start of Intel's "ok" range

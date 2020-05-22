@@ -2,7 +2,7 @@
 #include "screen.h"
 #include "../kernel/hardware.h"
 
-// Talk to hard disk using ATA (AT Attachment)
+// Talk to hard disk using ATA (Advanced Technology Attachment)
 // Most of this is from: http://lateblt.tripod.com/atapi.htm
 //
 
@@ -88,16 +88,12 @@ int disk_write(uint64_t lba, uint8_t *buf) {
 
     port_byte_out(ATA_COMMAND_REGISTER, ATA_CACHE_FLUSH);
 
-    // make sure all the data is flushed
-//    ata_wait_until_status(ATA_STATUS_READY);
-
     // check if an error was set:
     uint8_t status = port_byte_in(ATA_STATUS_REGISTER);
     if (status & ATA_STATUS_ERR) {
         // uh oh!
         print("Error writing disk...");
     }
-
 
     // re-enable interrupts
     asm volatile ("sti");

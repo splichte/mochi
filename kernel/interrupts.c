@@ -135,13 +135,9 @@ uint16_t scancodes[255] = {
     'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', 
     '`', SHIFT_IN, MISSING, 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', 
     '.', '/', SHIFT_IN, MISSING, ALT, ' ', ESC,
+    
+    [170] = SHIFT_OUT, [182] = SHIFT_OUT,
 };
-
-// we need to call this somewhere. 
-void finish_scancode_init() {
-    scancodes[170] = SHIFT_OUT;
-    scancodes[182] = SHIFT_OUT;
-}
 
 
 /* start network stuff
@@ -459,7 +455,7 @@ void pci_reg_write(uint16_t port, uint32_t data) {
     *((uint32_t*)(eth.bar0 + port)) = data;
 }
 
-void pci_reg_read(uint16_t port) {
+uint32_t pci_reg_read(uint16_t port) {
     return *((uint32_t*)(eth.bar0 + port));
 }
 
@@ -663,8 +659,6 @@ void setup_interrupt_descriptor_table() {
     // 0xfd == 1111 1101 == disable all but keyboard (IRQ1).
     port_byte_out(PIC1B, 0xfd);
     port_byte_out(PIC2B, 0xff);
-
-    finish_scancode_init();
 
     // We set gates like this, because we can't easily find functions by name
     // without a language that supports reflection!

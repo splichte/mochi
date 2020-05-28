@@ -1,7 +1,6 @@
 /* hardware.c is mostly from ToaruOS */
 #include "hardware.h"
 
-// TODO: use uint8_t, uint16_t
 unsigned char port_byte_in(unsigned short port) {
     unsigned char result;
     asm volatile ("in %%dx, %%al" : "=a" (result) : "d" (port));

@@ -29,7 +29,9 @@ load_kernel:
     call print_string
 
     mov bx, KERNEL_OFFSET
-    mov dh, 40                 ; we have to be careful to not
+    ; TODO: the max value that works here is 54.
+    ; uh...why? definitely needs investigation...
+    mov dh, 54                 ; we have to be careful to not
                                 ; load too many sectors. the disk 
                                 ; read fails if we do. any way 
                                 ; to pad extra sectors? 

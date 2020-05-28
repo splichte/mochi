@@ -132,7 +132,7 @@ void print_word(uint32_t word) {
     s[0] = '0';
 
     for (int i = 0; i < 8; i++) {
-        int ws = (word >> (i * 8)) & 0xF;
+        int ws = (word >> (i * 4)) & 0xF;
         if (ws >= 0 && ws < 10) {
             s[9 - i] = '0' + ws;
         } else {

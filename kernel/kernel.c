@@ -36,13 +36,8 @@ void main() {
     print("Welcome to Mochi ^_^ \n");
     print(">");
 
-    int i = get_e1000_interrupt();
-
-    if (i == -1) {
-        print("  :(  ");
-    } else {
-        print_byte(i);
-    }
+    transmit_initialization();
+    test_transmit();
 
     while (1) {
     }

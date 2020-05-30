@@ -29,14 +29,8 @@ load_kernel:
     call print_string
 
     mov bx, KERNEL_OFFSET
-    ; TODO: the max value that works here is 54.
-    ; uh...why? definitely needs investigation...
-    mov dh, 54                 ; we have to be careful to not
-                                ; load too many sectors. the disk 
-                                ; read fails if we do. any way 
-                                ; to pad extra sectors? 
-                                ; Update: I called dd in the Makefile
-                                ; to pad to 12 sectors. 
+    mov dh, 54              
+    
     mov dl, [BOOT_DRIVE]
     call disk_load
 
@@ -53,9 +47,9 @@ BEGIN_PM:
     jmp $
 
 BOOT_DRIVE      db 0
-MSG_REAL_MODE   db "Started in 16-bit real mode", 0
-MSG_PROT_MODE   db "Landed in 32-bit protected mode", 0
-MSG_LOAD_KERNEL db "Loading kernel into memory", 0
+MSG_REAL_MODE   db "Started in 16-bit real mode ", 0
+MSG_PROT_MODE   db "Landed in 32-bit protected mode ", 0
+MSG_LOAD_KERNEL db "Loading kernel into memory ", 0
 
 times 510-($-$$) db 0
 dw 0xaa55

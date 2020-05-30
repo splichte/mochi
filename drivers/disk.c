@@ -57,7 +57,7 @@ static void ata_wait_until_status(uint8_t desired_status) {
 }
 
 /* WARNING: buf must exist and be big enough to write a full sector! */
-int disk_write(uint64_t lba, uint8_t *buf) {
+void disk_write(uint64_t lba, uint8_t *buf) {
     // stop interrupts
     asm volatile ("cli");
 
@@ -97,14 +97,9 @@ int disk_write(uint64_t lba, uint8_t *buf) {
 
     // re-enable interrupts
     asm volatile ("sti");
-
 }
 
-/* WARNING: disk_read assumes buf has enough space for the read! */
-int disk_read(uint64_t lba, uint8_t *buf) {
-    // stop interrupts
-    asm volatile ("cli");
-
+void disk_read_internal(uint64_t lba, uint8_t *buf, uint8_t nsectors) {
     // busy wait until disk is ready.
     ata_wait_until_status(ATA_STATUS_READY);
 
@@ -112,7 +107,7 @@ int disk_read(uint64_t lba, uint8_t *buf) {
     port_byte_out(ATA_DRIVE_HEAD_REGISTER, 0xe0); // LBA mode, apparently
 
     // send # of sectors to read
-    port_byte_out(ATA_SECTOR_COUNT_REGISTER, 0x01);
+    port_byte_out(ATA_SECTOR_COUNT_REGISTER, nsectors);
 
     // byte 1 (bit 0-7) of LBA
     port_byte_out(ATA_LBA_LOW_REGISTER, (uint8_t) lba & 0xff);
@@ -136,6 +131,23 @@ int disk_read(uint64_t lba, uint8_t *buf) {
         // uh oh!
         print("Error reading disk... (2)");
     }
+}
+
+/* disk read function for use before interrupts are ready.
+ * (e.g. in bootloader). */
+
+/* TODO: this doesn't need to be bootloader-specific. 
+ * reading big chunks from disk is generally useful...*/
+void disk_read_bootloader(uint64_t lba, uint8_t *buf, uint8_t chunk) {
+    disk_read_internal(lba, buf, chunk);
+}
+
+/* WARNING: disk_read assumes buf has enough space for the read! */
+void disk_read(uint64_t lba, uint8_t *buf) {
+    // stop interrupts
+    asm volatile ("cli");
+
+    disk_read_internal(lba, buf, 0x01);
 
     // re-enable interrupts
     asm volatile ("sti");

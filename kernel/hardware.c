@@ -27,7 +27,8 @@ void port_multiword_out(unsigned short port, unsigned char *data, unsigned long 
 }
 
 void port_multiword_in(unsigned short port, unsigned char *data, unsigned long size) {
-    // TODO: what does "memory" do?
+    // what does "memory" do?
+    // -> https://stackoverflow.com/questions/14950614/working-of-asm-volatile-memory
     asm volatile ("rep insw" : "+D" (data), "+c" (size) : "d" (port) : "memory");
 }
 

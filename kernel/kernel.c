@@ -26,7 +26,7 @@ void test_image_persists() {
     disk_write(lba, out_buf);
 }
 
-void main() {
+int kmain() {
     clear_screen(); 
 
     setup_interrupt_controller();
@@ -41,5 +41,6 @@ void main() {
 
     while (1) {
     }
+    return 0;
 }
 

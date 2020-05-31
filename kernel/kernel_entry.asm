@@ -1,13 +1,7 @@
 [bits 32]
 [extern kmain]
 
-mov ebx, MSG_HI
-call print_string_pm
+; so linker thinks it knows where the function is. 
+; but it jumps to a bad location.
+call kmain
 
-; call kmain
-
-jmp $
-
-%include "boot/print_string_pm.asm"
-
-MSG_HI  db "Hello. ",0

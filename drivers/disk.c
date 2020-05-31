@@ -99,31 +99,37 @@ void disk_write(uint64_t lba, uint8_t *buf) {
     asm volatile ("sti");
 }
 
+// TODO: this is wrong. nsectors should always be 1. 
 void disk_read_internal(uint64_t lba, uint8_t *buf, uint8_t nsectors) {
     // busy wait until disk is ready.
     ata_wait_until_status(ATA_STATUS_READY);
 
     // https://wiki.osdev.org/ATA_read/write_sectors
-    port_byte_out(ATA_DRIVE_HEAD_REGISTER, 0xe0); // LBA mode, apparently
+    // we want bits 5 and 7 set. 1010 0000. 
+    uint8_t lba_highest = ((lba >> 24) & 0xff);
+    // https://wiki.osdev.org/ATA_PIO_Mode 
+    // Drive / Head registers
+    port_byte_out(ATA_DRIVE_HEAD_REGISTER, 0xe0 | lba_highest);
 
     // send # of sectors to read
     port_byte_out(ATA_SECTOR_COUNT_REGISTER, nsectors);
 
     // byte 1 (bit 0-7) of LBA
-    port_byte_out(ATA_LBA_LOW_REGISTER, (uint8_t) lba & 0xff);
+    port_byte_out(ATA_LBA_LOW_REGISTER, (uint8_t) (lba & 0xff));
 
     // byte 2 (bit 8-15) of LBA
-    port_byte_out(ATA_LBA_MID_REGISTER, (uint8_t) (lba >> 8) & 0xff);
+    port_byte_out(ATA_LBA_MID_REGISTER, (uint8_t) ((lba >> 8) & 0xff));
 
     // byte 3 (bit 16-23) of LBA
-    port_byte_out(ATA_LBA_HIGH_REGISTER, (uint8_t) (lba >> 16) & 0xff);
+    port_byte_out(ATA_LBA_HIGH_REGISTER, (uint8_t) ((lba >> 16) & 0xff));
 
     // command: read with retry
     port_byte_out(ATA_COMMAND_REGISTER, ATA_READ_WITH_RETRY);
 
-    ata_wait_until_status(ATA_STATUS_DATA_TRANSFER_REQUESTED);
-
-    port_multiword_in(ATA_DATA_REGISTER, buf, ATA_SECTOR_SIZE / 2);
+    for (int i = 0; i < nsectors; i++) {
+        ata_wait_until_status(ATA_STATUS_DATA_TRANSFER_REQUESTED);
+        port_multiword_in(ATA_DATA_REGISTER, (uint8_t *)(buf + i*ATA_SECTOR_SIZE), ATA_SECTOR_SIZE / 2);
+    }
 
     // check if an error was set:
     uint8_t status = port_byte_in(ATA_STATUS_REGISTER);

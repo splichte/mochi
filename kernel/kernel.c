@@ -28,7 +28,7 @@ void test_image_persists() {
 
 int kmain() {
     clear_screen(); 
-
+    
     setup_interrupt_controller();
 
     setup_interrupt_descriptor_table();

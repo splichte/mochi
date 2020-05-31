@@ -1,12 +1,12 @@
-C_SOURCES = $(wildcard kernel/*.c drivers/*.c boot/*.c)
-HEADERS = $(wildcard kernel/*.h drivers/*.h boot/*.h)
+C_SOURCES = $(wildcard kernel/*.c drivers/*.c)
+HEADERS = $(wildcard kernel/*.h drivers/*.h)
 
 # Convert the *.c files to *.o
 OBJ = ${C_SOURCES:.c=.o}
 
 all: os_image
 
-# NOTE: if e.g. switch_to_pm.asm changes, 'make run' will not refresh
+# TODO: if e.g. switch_to_pm.asm changes, 'make run' will not refresh
 # properly. need to run make clean.
 run: all
 	# https://wiki.qemu.org/Documentation/Networking#Network_Monitoring
@@ -20,12 +20,11 @@ run: all
 	-device e1000,netdev=mynet0 \
 	-object filter-dump,id=f1,netdev=mynet0,file=netdump.dat
 
-
-# os_image: boot/boot_sect.bin boot/bootloader.bin kernel.bin
 os_image: boot/boot_sect.bin boot/bootloader.bin kernel.bin
 	./prepare_image.sh
 
-boot/bootloader.bin: boot/bootloader_entry.o ${OBJ}
+# very important to not link in too many objects. 
+boot/bootloader.bin: boot/bootloader_entry.o boot/bootloader.o kernel/hardware.o drivers/screen.o drivers/disk.o
 	i386-elf-ld -Ttext 0x1000 --oformat binary $^ -o $@
 
 # "-Ttext 0x10000" must match KERNEL_ENTRY in boot/bootloader.c

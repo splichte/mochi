@@ -48,6 +48,12 @@ setup_memory_loop:
     jmp setup_memory_loop
 
 memory_done:
+    ; 0 out length field so kernel can know we're done.
+    add di, 8               ; length_low
+    mov ax, 0
+    mov [es:di], ax
+    add di, 8               ; length_high
+    mov [es:di], ax
     mov bx, MEMORY_DONE_MSG
     call print_string
 

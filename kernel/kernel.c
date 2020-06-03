@@ -28,6 +28,9 @@ void test_image_persists() {
 
 int kmain() {
     clear_screen(); 
+
+    setup_memory();
+    print_mem_blocks();
     
     setup_interrupt_controller();
 

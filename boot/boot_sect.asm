@@ -19,7 +19,7 @@ NEXT_BLOCK_OFFSET equ 0x1000    ; memory offset where we'll load next block
 
 load_next_block:
     mov bx, NEXT_BLOCK_OFFSET
-    mov dh, 54                  ; TODO: how many blocks do we actually need?
+    mov dh, 16                  ; 8kb
 
     mov dl, [BOOT_DRIVE]
     call disk_load

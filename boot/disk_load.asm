@@ -1,14 +1,14 @@
 ; load DH sectors to ES:BX from drive DL
 disk_load:
     push dx
-    
+
     mov ah, 0x02
     mov al, dh      ; read %dh sectors
     mov ch, 0x00    ; cylinder 0
     mov dh, 0x00    ; head 0
     mov cl, 0x02    ; read from 2nd sector (after the boot sector)
     int 0x13        ; BIOS interrupt
-    
+
     jc disk_error   ; jump if error (carry flag set?)
 
     pop dx

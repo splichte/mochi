@@ -3,7 +3,7 @@
 VIDEO_MEMORY equ 0xb8000
 WHITE_ON_BLACK equ 0x0f
 
-; prints a null-terminated string pointed to by EDX
+; prints a null-terminated string pointed to by EBX
 print_string_pm:
     pusha
     mov edx, VIDEO_MEMORY

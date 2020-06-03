@@ -1,13 +1,13 @@
-# booting code gets up to 4K.
-cat boot/boot_sect.bin boot/bootloader.bin > os_image
-#dd if=/dev/zero bs=4096 count=4 >> os_image
+# booting code gets up to 8K.
+cat boot/boot_sect.bin boot/switch_to_pm.bin boot/bootloader.bin > os_image
 
 b=$(wc -c os_image | awk '{ print $1 }')
-# pad to 4K
-dd if=/dev/zero bs=1 count=$((4096-$b)) >> os_image
+
+# pad to 8K
+dd if=/dev/zero bs=1 count=$((8192-$b)) >> os_image
 
 
-# OS code starts at byte 4096
+# OS code starts at byte 8192
 # and we guarantee it can have 8Mb.
 
 cat kernel.bin >> os_image

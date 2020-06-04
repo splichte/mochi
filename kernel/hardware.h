@@ -12,6 +12,8 @@ void port_dword_out(unsigned short port, unsigned int data);
 unsigned int port_dword_in(unsigned short port);
 
 
+void sys_exit();
+
 /* debugging */
 #define HALT()  while (1) { }
 #define PRINT_EIP()  do { \

@@ -308,8 +308,6 @@ typedef struct {
     uint32_t bar0;
 } pci_device;
 
-// do these addresses just exist in memory, or do I have to 
-// explicitly call port byte out/etc? 
 
 // address of the header for this BDF addr in pci configuration space 
 //
@@ -436,10 +434,9 @@ pci_device get_e1000() {
 
     // determine if it's mem space or io space
     // (it's mem space)
+    //
+    // evaluates to 0xfebc0000 on qemu
     e1000.bar0 = pci_get_bar0(e1000.bdf) & 0xfffffff0;
-
-    // what's at that register?
-    uint32_t w = port_dword_in(e1000.bar0 + 0x0008);
 
     return e1000;
 }

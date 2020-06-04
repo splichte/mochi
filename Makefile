@@ -34,9 +34,9 @@ boot/switch_to_pm.bin:	boot/switch_to_pm.asm
 boot/bootloader.bin: boot/bootloader_entry.o boot/bootloader.o kernel/hardware.o drivers/screen.o drivers/disk.o
 	i386-elf-ld -Ttext 0x1400 --oformat binary $^ -o $@
 
-# "-Ttext 0x10000" must match KERNEL_ENTRY in boot/bootloader.c
+# "-Ttext 0x1000000" must match KERNEL_ENTRY in boot/bootloader.c
 kernel.bin: kernel/kernel_entry.o ${OBJ}
-	i386-elf-ld -Ttext 0x10000 --oformat binary $^ -o $@
+	i386-elf-ld -Ttext 0x1000000 --oformat binary $^ -o $@
 
 # -mgeneral-regs-only lets you use __attribute__((interrupt))
 %.o : %.c ${HEADERS}

@@ -13,10 +13,10 @@
 #define SECTORS_TO_READ 1024
 
 #define KERNEL_START_SECTOR 16
-// the bootloader loads at 0x1400. 
-// this gives it maybe 32kb of space 
-// before hitting this entry point.
-#define KERNEL_ENTRY        0x10000
+
+// give 16Mb of room for ISA devices, etc.
+// see Linux Kernel Development 3rd ed.
+#define KERNEL_ENTRY        0x1000000
 
 int main() {
     clear_screen(); 

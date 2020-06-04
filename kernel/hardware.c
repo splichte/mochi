@@ -41,3 +41,7 @@ unsigned int port_dword_in(unsigned short port) {
     asm volatile ("inl %%dx, %%eax" : "=a" (rv) : "dN" (port));
     return rv;
 }
+
+void sys_exit() {
+    asm volatile ("end: \n\t jmp end");
+}

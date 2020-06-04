@@ -1,4 +1,6 @@
 #include "memory.h"
+#include "hardware.h"
+#include "../drivers/screen.h"
 #include <stdint.h>
 
 // set by boot code
@@ -6,19 +8,31 @@
 
 /* this is KERNEL_ENTRY + SECTORS_TO_READ * 512, 
  * from boot/bootloader.c. 
- * which is 0x10000 + 524288
- * which is 0x10000 + 0x80000
+ * which is 0x1000000 + 524288
+ * which is 0x1000000 + 0x80000
  */
-#define KERNEL_START    0x10000
+// we want 16Mb of clearance at the start for ISA devices, 
+// which is what linux defines as its DMA zone
+#define KERNEL_START    0x1000000
 #define KERNEL_END      (KERNEL_START + 0x80000)
 
 // don't write too low, to avoid interrupts, BIOS, etc.
 // this wastes some mem but it's OK
-#define OK_MEM_START    0x1000
+#define OK_MEM_START    0x1000000
 
+// don't write too high to avoid PCI devices
+// again, wastes some mem, but it's ok. 
+// qemu 128ish Mb doesn't get this high.
+#define OK_MEM_END      0x80000000  // PCI addresses
+                                    // bar0 for e.g. eth
+                                    // is 0xfebc0000
+
+#define AVAILABLE_RAM   1
+
+#define MAX_ADDR_BLOCKS 256
 
 // representation provided by the BIOS
-typedef struct _addr_range_desc {
+typedef struct {
     uint32_t base_addr_low;
     uint32_t base_addr_high;
     uint32_t length_low;
@@ -29,17 +43,24 @@ typedef struct _addr_range_desc {
 
 // linked list of free physical address blocks.
 // (2^32 bytes is 4 Gb, btw)
-typedef struct _phy_addr_block {
+typedef struct {
     uint64_t start;
     uint64_t end;
 } phy_addr_block;
 
-#define AVAILABLE_RAM   1
-
 // we don't have malloc yet to manage a linked list.
-#define MAX_ADDR_BLOCKS 256
 static phy_addr_block mem_block_list[MAX_ADDR_BLOCKS];
-static n_mem_blocks;
+static uint32_t n_mem_blocks;
+
+#define MAX_N_PAGES 1024
+static page pages[MAX_N_PAGES];
+static uint32_t npages;
+
+void page_init(page *p, uint64_t loc) {
+    p->flags = 0;
+    p->loc = loc;
+    p->free_mem_start = 0;
+}
 
 void setup_memory() {
     uint32_t i = ADDR_RANGE_DESC_START;
@@ -58,33 +79,43 @@ void setup_memory() {
 
         if (d.type != AVAILABLE_RAM) continue;
 
+        if (base_addr + length < OK_MEM_START) continue;
+
         phy_addr_block b = { base_addr, base_addr + length };
         mem_block_list[j++] = b;
     }
     n_mem_blocks = j;
 
-    // remove bad regions from the available memory blocks.
-    //
-    // TODO: handle PCI/ISA memory-mapped devices
-    // (not handled now since those addresses are much higher
-    // than our available memory will go)
-    //
-    // also making some assumptions here because the memory 
-    // blocks look a certain way on qemu (for instance, that no 
-    // returned memory block is entirely in a bad region, only 
-    // partially). 
+    // making some assumptions here because the memory 
+    // blocks look a certain way on qemu.
     // that might not hold up on other machines.
     // call print_mem_blocks() to see.
-    if (n_mem_blocks == 2) {
-        // block 1: 0x00000 to 0x9fc00
-        mem_block_list[0].start = OK_MEM_START;
-
-        // block 2: 0x00100000 to 0x07ee0000
-        mem_block_list[1].start = KERNEL_END;
+    if (n_mem_blocks == 1) {
+        if (mem_block_list[0].start < KERNEL_END) {
+            mem_block_list[0].start = KERNEL_END;
+        }
+        if (mem_block_list[0].end > OK_MEM_END) {
+            mem_block_list[0].end = OK_MEM_END;
+        }
     } else {
-        print("Unhandled number of memory blocks.\n");
+        print("ERR: Unhandled number of memory blocks.\n");
+        sys_exit();
     }
+
+    // initializing physical pages, assuming we 
+    // only have 1 memory block.
+    phy_addr_block p = mem_block_list[0];
+    npages = (p.end - p.start) / PAGE_SIZE;
+
+    for (int i = 0; i < npages; i++) {
+        uint64_t loc = p.start + (PAGE_SIZE * i);
+        page_init(pages + i, loc);
+    }
+
+    // now, all pages are initialized...
 }
+
+
 
 void print_mem_blocks() {
     print("Memory blocks (Start, End)\n");

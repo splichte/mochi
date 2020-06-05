@@ -9,9 +9,8 @@
 // a physical page in memory. 4KB. 
 typedef struct {
     uint8_t flags;  // lock, dirty, etc.
-    uint64_t loc;  // location in physical memory
-    uint16_t use_count; // processes using this page
-    uint16_t free_mem_start;
+    uint32_t loc;  // location in physical memory
+    uint16_t following; // for freeing pages allocated in chunks
 } page;
 
 void setup_memory();
@@ -20,9 +19,9 @@ void print_mem_blocks();
 // we need a list of pages
 // but we don't know how big it's going to be...
 // allocate continuous memory region
-page *page_alloc();
+void page_alloc(page *p);
 void page_free(page *p);
 
-int kmalloc();
-int kfree();
+void *kmalloc(uint32_t sz);
+void kfree();
 

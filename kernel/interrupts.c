@@ -21,6 +21,17 @@
 #define PIC_EOI 0x20
 
 
+// programmable interrupt timer stuff -- from ToaruOS
+#define PIT_A       0x40
+#define PIT_B       0x41
+#define PIT_C       0x42
+#define PIT_CTRL    0x43
+
+#define PIT_MASK    0xff
+#define PIT_SCALE   1193180
+#define PIT_SET     0x34
+
+
 // from GCC docs:
 // https://gcc.gnu.org/onlinedocs/gcc/x86-Function-Attributes.html
 struct interrupt_frame {
@@ -31,7 +42,7 @@ struct interrupt_frame {
     uint32_t ss;
 };
 
-// note: exceptions push different things on the stack than do interrupts.
+// NOTE: exceptions push different things on the stack than do interrupts.
 // these handlers are used for un-assigned interrupts, so we can have 
 // a generic handler that fires and logs what int # came.
 #define INT(i) \
@@ -39,7 +50,7 @@ struct interrupt_frame {
     void interrupt_##i(struct interrupt_frame *frame) { \
         asm volatile ("cli"); \
         print_byte(i);\
-        if (i > 32 && i < 48) { \
+        if (i >= 32 && i < 48) { \
             if (i > 39 && i < 48) { \
                 port_byte_out(PIC2A, PIC_EOI); \
             } \
@@ -88,7 +99,14 @@ INT(28);
 INT(29);
 INT(30);
 INT(31);
-INT(32);
+
+/* NOTE:
+ *  Operation Command Byte 1 (in setup_descriptor_table) 
+ *  prevents PIC IRQ lines other than 0 (timer) and 1 (keyboard)
+ *  from firing.
+ */
+
+// INT(32); - timer -- don't need.
 // INT(33); - keyboard -- don't need.
 INT(34);
 INT(35);
@@ -623,6 +641,17 @@ void kbd_handler(struct interrupt_frame *frame) {
 }
 
 __attribute__ ((interrupt))
+void timer_handler(struct interrupt_frame *frame) {
+    asm volatile ("cli");
+
+    // determine if we should switch tasks...
+    // we need to store the registers somewhere, then
+
+    port_byte_out(PIC1A, PIC_EOI);
+    asm volatile ("sti");
+}
+
+__attribute__ ((interrupt))
 void null_interrupt(struct interrupt_frame *frame) {
     asm volatile ("cli");
     print("Unhandled\n");
@@ -653,8 +682,9 @@ idt_gate set_gate(uint32_t handler_ptr) {
 // entries start at entry 32 (0-indexed)
 void setup_interrupt_descriptor_table() {
     // Operation Command Byte 1 [2]
-    // 0xfd == 1111 1101 == disable all but keyboard (IRQ1).
-    port_byte_out(PIC1B, 0xfd);
+    // 0xfc == 1111 1100 == disable all but keyboard (IRQ1)
+    // and timer (IRQ0)
+    port_byte_out(PIC1B, 0xfc);
     port_byte_out(PIC2B, 0xff);
 
     // We set gates like this, because we can't easily find functions by name
@@ -692,7 +722,7 @@ void setup_interrupt_descriptor_table() {
     idt[29] = set_gate((uint32_t) &interrupt_29);
     idt[30] = set_gate((uint32_t) &interrupt_30);
     idt[31] = set_gate((uint32_t) &interrupt_31);
-    idt[32] = set_gate((uint32_t) &interrupt_32);
+    idt[32] = set_gate((uint32_t) &timer_handler); // timer!!
     idt[33] = set_gate((uint32_t) &kbd_handler); // keyboard!!
     idt[34] = set_gate((uint32_t) &interrupt_34);
     idt[35] = set_gate((uint32_t) &interrupt_35);

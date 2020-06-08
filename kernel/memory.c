@@ -52,6 +52,29 @@ typedef struct {
     uint64_t end;
 } phy_addr_block;
 
+
+
+// each page directory entry manages
+// a 4Mb chunk. page size is 4Kb, 
+// so that means it manages 1000 pages. 
+// also, it must be 4kb-aligned. I 
+// don't know what the easiest way to 
+// ensure that is...
+
+/* bits 12-31 are page table address.
+ * bits 9-11 are unused.
+ * bits 0-8 are flags.
+ * NOTE: must be 4kb-aligned.
+ */
+typedef struct __attribute__((packed)) {
+    uint16_t addr;
+    uint16_t addr_free_flags; 
+} page_directory_entry;
+
+//typedef struct __attribute__((packed)) {
+//
+//} page_table_entry;
+
 // we don't have malloc yet to manage a linked list.
 static phy_addr_block mem_block_list[MAX_ADDR_BLOCKS];
 static uint32_t n_mem_blocks;

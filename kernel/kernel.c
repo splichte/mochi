@@ -3,6 +3,7 @@
 #include "hardware.h"
 #include "interrupts.h"
 #include "memory.h"
+#include "devices.h"
 #include <stdint.h>
 
 #define NULL 0
@@ -56,7 +57,7 @@ int kmain() {
     print("done testing memory\n");
 
     transmit_initialization();
-//    test_transmit();
+    test_transmit();
 
     while (1) {
     }

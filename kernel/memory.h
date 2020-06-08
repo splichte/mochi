@@ -6,7 +6,7 @@
 #define PAGE_FULL       (1 << 0)
 #define PAGE_IN_USE     (1 << 1)
 
-// a physical page in memory. 4KB. 
+// a physical page in memory. 4KB.
 typedef struct {
     uint8_t flags;  // lock, dirty, etc.
     uint32_t loc;  // location in physical memory
@@ -16,9 +16,6 @@ typedef struct {
 void setup_memory();
 void print_mem_blocks();
 
-// we need a list of pages
-// but we don't know how big it's going to be...
-// allocate continuous memory region
 void page_alloc(page *p);
 void page_free(page *p);
 

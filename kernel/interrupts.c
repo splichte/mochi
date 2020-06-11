@@ -173,6 +173,7 @@ idt_gate set_gate(uint32_t handler_ptr) {
     return kbdg;
 }
 
+extern void timer_handler(struct interrupt_frame *frame);
 
 // see [2], Ch. 9 - "Exceptions and Interrupts"
 // the IDT has 256 total entries. Our PIC-defined 
@@ -183,6 +184,8 @@ void setup_interrupt_descriptor_table() {
     // and timer (IRQ0)
     port_byte_out(PIC1B, 0xfc);
     port_byte_out(PIC2B, 0xff);
+
+    timer_setup();
 
     // We set gates like this, because we can't easily find functions by name
     // without a language that supports reflection!

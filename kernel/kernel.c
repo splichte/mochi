@@ -2,11 +2,12 @@
 #include "../drivers/disk.h"
 #include "hardware.h"
 #include "interrupts.h"
+#include "process.h"
 #include "memory.h"
 #include "devices.h"
 #include <stdint.h>
-
-#define NULL 0
+#include <stddef.h>
+//#define NULL 0
 
 void test_image_persists() {
     uint8_t out_buf[512];
@@ -56,10 +57,14 @@ int kmain() {
     test_memory();
     print("done testing memory\n");
 
+    // test processes.
+    init_root_process();
+
     transmit_initialization();
-    test_transmit();
+//    test_transmit();
 
     while (1) {
+
     }
     return 0;
 }

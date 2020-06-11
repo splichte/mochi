@@ -16,6 +16,13 @@
 
 #define PIC_EOI 0x20
 
+// trying this stuff out.
+#define pause_interrupts()  asm volatile ("cli")
+#define resume_interrupts()  asm volatile ("sti")
+#define ack_interrupt_pic1()   port_byte_out(PIC1A, PIC_EOI)
+#define ack_interrupt_pic2()   port_byte_out(PIC2A, PIC_EOI)
+
+
 // from GCC docs:
 // https://gcc.gnu.org/onlinedocs/gcc/x86-Function-Attributes.html
 struct interrupt_frame {

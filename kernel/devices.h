@@ -7,6 +7,7 @@ __attribute__ ((interrupt))
 void kbd_handler(struct interrupt_frame *frame);
 
 // timer
+void timer_setup();
 __attribute__ ((interrupt))
 void timer_handler(struct interrupt_frame *frame);
 

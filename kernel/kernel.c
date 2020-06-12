@@ -41,6 +41,8 @@ void test_memory() {
     }
 }
 
+extern void fork();
+
 int kmain() {
     clear_screen(); 
 
@@ -59,6 +61,13 @@ int kmain() {
 
     // test processes.
     init_root_process();
+
+    fork();
+//    print("hello from fork\n");
+//    print_word(p);
+//    create_test_process();
+
+    // create a new "test process"?
 
     transmit_initialization();
 //    test_transmit();

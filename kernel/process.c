@@ -9,6 +9,28 @@ process *get_current_process() {
     return current_process;
 }
 
+// the goal is to set up registers
+// the same way an interrupt would.
+pid_t fork_inner(registers r) {
+    // r should "make sense"!
+    process *p = get_current_process();
+    process *test = (process *)kmalloc(sizeof(process));
+
+    // store registers at this point.
+    test->regs = r;
+    p->regs = r;
+    test->ts = 500;
+    test->pid = 2;
+    test->prev = p;
+    test->next = p;
+
+    p->prev = test;
+    p->next = test;
+
+    return test->pid;
+}
+
+
 // when the old process returns from the interrupt handler... 
 // won't the stack (with the registers) automatically be popped? 
 // maybe the current registers aren't dumped, I don't know. 
@@ -24,15 +46,10 @@ void set_current_process(process *p, registers r) {
 
     current_process = p;
 
-    print("switching process\n");
-
-    // these should be the same for now.
-    print_word(p_old);
-    print_word(p);
-
-    // we should dump register contents...see what's up.
-
+    print("switching process to: \n");
+    print_word(p->pid);
     print_word(p->regs.eip);
+    // we should dump register contents...see what's up.
 
     // restore registers from process struct, 
     // and start executing.

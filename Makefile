@@ -35,7 +35,7 @@ boot/bootloader.bin: boot/bootloader_entry.o boot/bootloader.o kernel/hardware.o
 	i386-elf-ld -Ttext 0x1400 --oformat binary $^ -o $@
 
 # "-Ttext 0x1000000" must match KERNEL_ENTRY in boot/bootloader.c
-kernel.bin: kernel/kernel_entry.o kernel/timer_irq.o ${OBJ}
+kernel.bin: kernel/kernel_entry.o kernel/timer_irq.o kernel/fork.o ${OBJ}
 	i386-elf-ld -Ttext 0x1000000 --oformat binary $^ -o $@
 
 # -mgeneral-regs-only lets you use __attribute__((interrupt))

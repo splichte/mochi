@@ -35,36 +35,33 @@ void test_memory() {
     p = (uint32_t *) kmalloc(20);
     if (p == NULL) {
         print("uh oh!\n");
-    } else {
-        print("good!\n");
     }
 }
 
 extern pid_t fork();
 
 int kmain() {
-    clear_screen(); 
+//    clear_screen();
+//    setup_memory();
 
-    setup_memory();
-    print_mem_blocks();
+//    setup_vmem();
 
-    setup_interrupt_controller();
+    notify_screen_mmu_on();
 
-    setup_interrupt_descriptor_table();
-
-    setup_vmem();
+    clear_screen();
 
     print("Welcome to Mochi ^_^ \n");
     print(">");
 
-    // should fail. and trigger an exception handler.
+    HALT();
+
     test_memory();
-//    print("done testing memory\n");
+    transmit_initialization();
+    test_transmit();
+
 
     // test processes.
 //    init_root_process();
-
-    // when I set sth to the return value of fork it doesn't work anymore :(
 
 //    pid_t pid = fork();
 
@@ -79,9 +76,6 @@ int kmain() {
 //        while (1) {
 //        }
 //    }
-
-    transmit_initialization();
-    test_transmit();
 
     while (1) {
 

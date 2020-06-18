@@ -14,7 +14,7 @@ run: all
 	# useful: memory_region*
 	#	-d in_asm,op,trace:memory_region*,trace:guest_mem* 
 #	~/code/qemu/build/i386-softmmu/qemu-system-i386 -s 
-	qemu-system-i386 \
+	qemu-system-i386 -d in_asm,mmu,cpu_reset \
 		-drive format=raw,file=os_image,index=0 \
 	-netdev user,id=mynet0,hostfwd=tcp::8080-:80 \
 	-device e1000,netdev=mynet0 \
@@ -30,13 +30,14 @@ boot/switch_to_pm.bin:	boot/switch_to_pm.asm
 	nasm $< -f bin -o $@
 
 # very important to not link in too many objects. 
-# how does this run? 0x1000 should be offset...not raw addr
 boot/bootloader.bin: boot/bootloader_entry.o boot/bootloader.o kernel/hardware.o drivers/screen.o drivers/disk.o
-	i386-elf-ld -Ttext 0x1400 --oformat binary $^ -o $@
+	i386-elf-ld -Ttext 0x2000 --oformat binary $^ -o $@
 
-# "-Ttext 0x1000000" must match KERNEL_ENTRY in boot/bootloader.c
+# "-Ttext 0xc1000000" must match KERNEL_ENTRY in boot/bootloader.c
+# (with an offset of 0xc0000000, to make a higher half kernel.)
+# 
 kernel.bin: kernel/kernel_entry.o kernel/timer_irq.o kernel/fork.o ${OBJ}
-	i386-elf-ld -Ttext 0x1000000 --oformat binary $^ -o $@
+	i386-elf-ld -Ttext 0xc1000000 --oformat binary $^ -o $@
 
 # -mgeneral-regs-only lets you use __attribute__((interrupt))
 %.o : %.c ${HEADERS}

@@ -9,10 +9,16 @@
 #define REG_SCREEN_CTRL 0x3d4
 #define REG_SCREEN_DATA 0x3d5
 
+static int mmu_is_on = 0;
+
 /* forward declarations */
 int get_screen_offset(int col, int row);
 int get_cursor();
 void set_cursor(int offset);
+
+void notify_screen_mmu_on() {
+    mmu_is_on = 1;
+}
 
 void print(char *message) {
     print_at(message, -1, -1);
@@ -34,7 +40,12 @@ void print_at(char *message, int col, int row) {
  * the other functions just wrap it. */
 /* i.e. lowest-level print. */
 void print_char(char c, int col, int row, char attr_byte) {
-    unsigned char *vidmem = (unsigned char *) VIDEO_ADDRESS;
+    unsigned char *vidmem;
+    if (mmu_is_on) {
+        vidmem = (unsigned char *) (VIDEO_ADDRESS + KERNEL_OFFSET);
+    } else {
+        vidmem = (unsigned char *) VIDEO_ADDRESS;
+    }
 
     if (!attr_byte) {
         attr_byte = WHITE_ON_BLACK;

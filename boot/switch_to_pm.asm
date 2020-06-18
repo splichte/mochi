@@ -2,7 +2,7 @@
 
 [org 0x1000] ; matching NEXT_BLOCK_OFFSET in boot_sect.asm
 [bits 16]
-BOOTLOADER_OFFSET   equ 0x1400   ; this code uses 2 blocks of 512-byte
+BOOTLOADER_OFFSET   equ 0x2000
 
 ; Switch to protected mode
 switch_to_pm:
@@ -88,6 +88,9 @@ init_pm:
                           ; if it grows too big, we'll corrupt 
                           ; kernel code. be careful...!
     mov esp, ebp
+    
+    mov ebx, MSG_PM
+    call print_string_pm
 
     jmp BOOTLOADER_OFFSET
 

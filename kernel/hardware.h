@@ -1,3 +1,5 @@
+#define BOOTLOADER_OFFSET   0x2000
+#define KERNEL_OFFSET       0xc0000000
 /* note: we must use e.g. "unsigned short" instead of "uint16_t" 
  * so that the underlying "asm" command is happy with its operand constraints. */
 

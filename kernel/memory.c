@@ -4,79 +4,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// virtual memory start!
-// in the future, there will be multiple of these...
-uint32_t page_directory[1024] __attribute__((aligned (4096)));
-
-// hmmm
-uint32_t page_table[1024] __attribute__((aligned (4096)));
-uint32_t page_table_low[1024] __attribute__((aligned (4096)));
-uint32_t page_table_bar[1024] __attribute__((aligned (4096)));
-
-void make_table(uint32_t *pt, uint32_t start_addr) {
-    for (int i = 0; i < 1024; i++) {
-        uint32_t i_addr = (uint32_t) (start_addr + (i * 0x1000));
-        pt[i] =  i_addr | 1;
-    }
-}
-
-void setup_identity_map() {
-    // kernel is in range 0x01000000 - 0x01100000 
-    // we want to identity-map that region!
-    // we need how many page tables? 
-
-    // bit 24 is set as 1. 
-
-    // so we have bits 22-31. (10 bits) for the dir
-    // bits 12-21 (10 bits) for the page
-    // and bits 0-11 (12 bits) for the offset.
-
-    page_directory[0] = ((uint32_t) page_table_low) | 1;
-    page_directory[4] = ((uint32_t) page_table ) | 1;
-    // first 10 bits of 0xfebc: 1111111010 = 1018
-    page_directory[1018] = ((uint32_t) page_table_bar) | 1;
-
-    make_table(page_table_low, 0x0);
-    make_table(page_table, 0x01000000);
-    make_table(page_table_bar, 0xfebc0000);
-}
-
-void dump_position_regs() {
-    uint32_t esp, ebp;
-    asm volatile ("mov %%ebp, %0" : "=r" (ebp) :);
-    asm volatile ("mov %%esp, %0" : "=r" (esp) :);
-    print("esp: "); print_word(esp);
-    print("ebp: "); print_word(ebp);
-//    PRINT_EIP();
-}
-
-void setup_vmem() {
-    uint32_t test;
-
-    setup_identity_map();
-
-//    print("cr0 before: ");
-//    asm volatile ("mov %%cr0, %%eax\n\t"
-//            "mov %%eax, %0" : "=r" (test) :);
-//    print_word(test);
-
-    asm volatile ("mov %0, %%eax" : : "r" (page_directory));
-
-    asm volatile ("mov %%eax, %%cr3\n\t"
-                  "mov %%cr0, %%eax\n\t" 
-                  "or $0x80000000, %%eax\n\t"
-                  "mov %%eax, %%cr0" ::);
-
-//    asm volatile ("mov %%eax, %0" : "=r" (test) :);
-//    print_word(test);
-//    PRINT_EIP();
-
-//    asm volatile ("mov %%cr0, %%eax\n\t"
-//            "mov %%eax, %0" : "=r" (test) :);
-//    print("cr0 after: ");
-//    print_word(test);
-}
-
 // set by boot code
 #define ADDR_RANGE_DESC_START 0xf000
 
@@ -209,6 +136,7 @@ allocation_record *add_allocation_record(uint32_t ptr, uint32_t len, page *p) {
     return ret;
 }
 
+// just read memory blocks. don't do anything special yet.
 void setup_memory() {
     uint32_t i = ADDR_RANGE_DESC_START;
     uint32_t j = 0; // mem_block_list
@@ -254,6 +182,11 @@ void setup_memory() {
         print_mem_blocks();
         sys_exit();
     }
+
+}
+
+void setup_memory_long() {
+    setup_memory();
 
     // initializing physical pages, assuming we 
     // only have 1 memory block.

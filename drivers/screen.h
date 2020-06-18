@@ -8,3 +8,5 @@ void clear_screen();
 // debugging prints, used in interrupts
 void print_byte(uint8_t i); 
 void print_word(uint32_t word);
+
+void notify_screen_mmu_on();

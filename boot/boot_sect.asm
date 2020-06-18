@@ -14,14 +14,18 @@ NEXT_BLOCK_OFFSET equ 0x1000    ; memory offset where we'll load next block
 
     call load_next_block
 
+    call print_string
+
     ; jump to next block
     jmp NEXT_BLOCK_OFFSET
 
+; damn. we can't address high enough to make this easy.
 load_next_block:
     mov bx, NEXT_BLOCK_OFFSET
-    mov dh, 16                  ; 8kb
+    mov dh, 32                  ; 16kb = 0x4000
 
     mov dl, [BOOT_DRIVE]
+    mov cl, 0x02         ; read from 2nd sector (after boot sector)
     call disk_load
 
     ret
@@ -31,6 +35,9 @@ load_next_block:
 %include "boot/print_string.asm"
 
 BOOT_DRIVE      db 0
+
+BOOT_OK:
+    db "Ok boot",0
 
 times 510-($-$$) db 0
 dw 0xaa55

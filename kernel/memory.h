@@ -22,3 +22,4 @@ void page_free(page *p);
 void *kmalloc(uint32_t sz);
 void kfree();
 
+void setup_vmem();

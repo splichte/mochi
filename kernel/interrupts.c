@@ -27,7 +27,14 @@
      __attribute__((interrupt)) \
     void interrupt_##i(struct interrupt_frame *frame, uint32_t error_code) { \
         asm volatile ("cli"); \
-        print_byte(i); \
+        print("exception #: "); print_byte(i);\
+        print("instruction: "); \
+        print_word(frame->ip);\
+        uint32_t test; \
+        asm volatile ("mov %%cr2, %%eax\n\t"\
+                "mov %%eax, %0" : "=r" (test) :); \
+        print("attempted to access: "); print_word(test); \
+        HALT();\
         asm volatile ("sti"); \
     } \
 
@@ -45,24 +52,24 @@ EXCEPTION(10);
 EXCEPTION(11);
 EXCEPTION(12);
 EXCEPTION(13);
-INT(14);
-INT(15);
-INT(16);
-INT(17);
-INT(18);
-INT(19);
-INT(20);
-INT(21);
-INT(22);
-INT(23);
-INT(24);
-INT(25);
-INT(26);
-INT(27);
-INT(28);
-INT(29);
-INT(30);
-INT(31);
+EXCEPTION(14);
+EXCEPTION(15);
+EXCEPTION(16);
+EXCEPTION(17);
+EXCEPTION(18);
+EXCEPTION(19);
+EXCEPTION(20);
+EXCEPTION(21);
+EXCEPTION(22);
+EXCEPTION(23);
+EXCEPTION(24);
+EXCEPTION(25);
+EXCEPTION(26);
+EXCEPTION(27);
+EXCEPTION(28);
+EXCEPTION(29);
+EXCEPTION(30);
+EXCEPTION(31);
 
 /* NOTE:
  *  Operation Command Byte 1 (in setup_descriptor_table) 
@@ -182,7 +189,7 @@ void setup_interrupt_descriptor_table() {
     // Operation Command Byte 1 [2]
     // 0xfc == 1111 1100 == disable all but keyboard (IRQ1)
     // and timer (IRQ0)
-    port_byte_out(PIC1B, 0xfc);
+    port_byte_out(PIC1B, 0xfd);
     port_byte_out(PIC2B, 0xff);
 
     timer_setup();

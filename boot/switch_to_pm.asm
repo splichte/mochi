@@ -83,7 +83,10 @@ init_pm:
     mov fs, ax
     mov gs, ax
 
-    mov ebp, 0x90000    ; update stack position
+    mov ebp, 0x1100000    ; update stack position to be at 16 + 1 Mb
+                          ; (where we set KERNEL_END in kernel/memory.c)
+                          ; if it grows too big, we'll corrupt 
+                          ; kernel code. be careful...!
     mov esp, ebp
 
     jmp BOOTLOADER_OFFSET

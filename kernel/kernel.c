@@ -7,7 +7,6 @@
 #include "devices.h"
 #include <stdint.h>
 #include <stddef.h>
-//#define NULL 0
 
 void test_image_persists() {
     uint8_t out_buf[512];
@@ -41,36 +40,48 @@ void test_memory() {
     }
 }
 
-extern void fork();
+extern pid_t fork();
 
 int kmain() {
     clear_screen(); 
 
     setup_memory();
     print_mem_blocks();
-    
+
     setup_interrupt_controller();
 
     setup_interrupt_descriptor_table();
 
+    setup_vmem();
+
     print("Welcome to Mochi ^_^ \n");
     print(">");
 
+    // should fail. and trigger an exception handler.
     test_memory();
-    print("done testing memory\n");
+//    print("done testing memory\n");
 
     // test processes.
-    init_root_process();
+//    init_root_process();
 
-    fork();
-//    print("hello from fork\n");
-//    print_word(p);
-//    create_test_process();
+    // when I set sth to the return value of fork it doesn't work anymore :(
 
-    // create a new "test process"?
+//    pid_t pid = fork();
+
+//    if (pid == 1) {
+//        print("entered 1!\n");
+//        while (1) {
+//        }
+//    }
+//
+//    if (pid == 2) {
+//        print("entered 2!\n");
+//        while (1) {
+//        }
+//    }
 
     transmit_initialization();
-//    test_transmit();
+    test_transmit();
 
     while (1) {
 

@@ -45,6 +45,9 @@ int kmain() {
 //    clear_screen();
 
     notify_screen_mmu_on();
+    clear_screen();
+
+
     // once we're in kernel, we need to immediately set the 
     // page tables to make sure we don't run out of memory.
     setup_memory();
@@ -52,7 +55,6 @@ int kmain() {
     setup_interrupt_controller();
     setup_interrupt_descriptor_table();
 
-    clear_screen();
 
 //    finish_vmem_setup();
 

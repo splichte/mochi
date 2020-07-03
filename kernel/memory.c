@@ -145,7 +145,14 @@ void set_pt_bit(uint16_t i) {
     pt_bitmap[val] |= 1 << offset;
 }
 
-uint8_t get_pt_bit(uint16_t i) {
+void unset_pt_bit(uint16_t i) {
+    uint8_t val = i / 32;
+    uint8_t offset = i % 32;
+    pt_bitmap[val] ^= 1 << offset;
+}
+
+
+uint8_t pt_bit_is_set(uint16_t i) {
     uint8_t val = i / 32;
     uint8_t offset = i % 32;
     uint32_t present = pt_bitmap[val] & (1 << offset);
@@ -156,7 +163,7 @@ uint8_t get_pt_bit(uint16_t i) {
 uint32_t *get_free_page_table() {
     uint8_t found = 0;
     for (int i = 0; i < 1024; i++) {
-        if (get_pt_bit(i) ^ 1) {
+        if (!pt_bit_is_set(i)) {
             set_pt_bit(i);
 
             // do we have to correct this? 
@@ -183,6 +190,7 @@ uint8_t map_free_page(uint32_t virtual_addr) {
     // get a free physical page. 
     // TODO: this should be able to fail.
     // when it does...time to evict!
+
     uint32_t phy_page_addr = alloc_page();
 
 
@@ -193,13 +201,15 @@ uint8_t map_free_page(uint32_t virtual_addr) {
 
     uint32_t pd_entry = pd[pd_i];
     // entry not present. 
-    if (pd_entry ^ 0x1) {
+    if (!(pd_entry & 1)) {
+//        print("pd index: "); print_word(pd_i);
+//        print("pd entry: "); print_word(pd_entry);
         // get a free page table (using bitmap)
         uint32_t *pt = get_free_page_table();
 
         // update page directory with this new table!
         // NOTE: we have to correct for the mapping...
-        pd[pd_i] = ((uint32_t) pt - 0xc0000000) | 1;
+        pd[pd_i] = ((uint32_t) pt - KERNEL_OFFSET) | 1;
 
         // set the physical page 
         pt[pt_i] = phy_page_addr | 1;
@@ -212,8 +222,9 @@ uint8_t map_free_page(uint32_t virtual_addr) {
 
     // chop off the low 12 bits to get the page table address
     // of this entry
-    uint32_t *pt = (uint32_t *) (pd_entry ^ 0xfff);
-
+    uint32_t *pt = (uint32_t *) ((pd_entry & 0xfffff000) + KERNEL_OFFSET);
+//    print("pt addr: "); print_word((uint32_t) pt);
+//    print("page allocated: "); print_word(phy_page_addr);
     pt[pt_i] = phy_page_addr | 1;
 
 

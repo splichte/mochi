@@ -9,6 +9,8 @@
 // how on earth do we fix up the page tables 
 // once we're already inside vmem?
 
+static call_ctr = 0;
+
 __attribute__ ((interrupt))
 void page_fault_handler(struct interrupt_frame *frame, uint32_t error_code) {
     asm volatile ("cli");
@@ -22,9 +24,13 @@ void page_fault_handler(struct interrupt_frame *frame, uint32_t error_code) {
     map_free_page(mem_addr);
 
     // TODO: if all pages used, evict some page
+//    call_ctr++;
+//
+//    if (call_ctr == 4) {
+//        HALT();
+//    }
 
 
-//    HALT();
     asm volatile ("sti");
 
 }

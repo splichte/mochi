@@ -198,6 +198,7 @@ uint8_t map_free_page(uint32_t virtual_addr) {
         uint32_t *pt = get_free_page_table();
 
         // update page directory with this new table!
+        // NOTE: we have to correct for the mapping...
         pd[pd_i] = ((uint32_t) pt - 0xc0000000) | 1;
 
         // set the physical page 
@@ -208,7 +209,7 @@ uint8_t map_free_page(uint32_t virtual_addr) {
 
     // CASE 2: this 4Mb section is "present". 
     // we only need to map a new page. 
-   
+
     // chop off the low 12 bits to get the page table address
     // of this entry
     uint32_t *pt = (uint32_t *) (pd_entry ^ 0xfff);

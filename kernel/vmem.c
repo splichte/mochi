@@ -18,14 +18,11 @@ void page_fault_handler(struct interrupt_frame *frame, uint32_t error_code) {
             "mov %%eax, %0" : "=r" (mem_addr) :); 
 
 //    print("attempted to access: "); print_word(mem_addr); 
-    // so, this isn't working...lol
+
     map_free_page(mem_addr);
 
     // TODO: if all pages used, evict some page
 
-    // do we need to reload cr3?
-//    asm volatile ("mov %%cr3, %%eax\n\t"
-//            "mov %%eax, %%cr3"::);
 
 //    HALT();
     asm volatile ("sti");

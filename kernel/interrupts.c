@@ -30,6 +30,7 @@
         print("exception #: "); print_byte(i);\
         print("instruction: "); \
         print_word(frame->ip);\
+        print("cs: "); print_word(frame->cs);\
         uint32_t test; \
         asm volatile ("mov %%cr2, %%eax\n\t"\
                 "mov %%eax, %0" : "=r" (test) :); \
@@ -52,7 +53,7 @@ EXCEPTION(10);
 EXCEPTION(11);
 EXCEPTION(12);
 EXCEPTION(13);
-EXCEPTION(14);
+//EXCEPTION(14);    // page fault (vmem handler)
 EXCEPTION(15);
 EXCEPTION(16);
 EXCEPTION(17);
@@ -77,7 +78,7 @@ EXCEPTION(31);
  *  from firing.
  */
 
-// INT(32); - timer -- don't need.
+INT(32);  // - timer -- don't need.
 // INT(33); - keyboard -- don't need.
 INT(34);
 INT(35);
@@ -192,7 +193,7 @@ void setup_interrupt_descriptor_table() {
     port_byte_out(PIC1B, 0xfd);
     port_byte_out(PIC2B, 0xff);
 
-    timer_setup();
+//    timer_setup();
 
     // We set gates like this, because we can't easily find functions by name
     // without a language that supports reflection!
@@ -211,7 +212,7 @@ void setup_interrupt_descriptor_table() {
     idt[11] = set_gate((uint32_t) &interrupt_11);
     idt[12] = set_gate((uint32_t) &interrupt_12);
     idt[13] = set_gate((uint32_t) &interrupt_13);
-    idt[14] = set_gate((uint32_t) &interrupt_14);
+    idt[14] = set_gate((uint32_t) &page_fault_handler);
     idt[15] = set_gate((uint32_t) &interrupt_15);
     idt[16] = set_gate((uint32_t) &interrupt_16);
     idt[17] = set_gate((uint32_t) &interrupt_17);
@@ -229,7 +230,9 @@ void setup_interrupt_descriptor_table() {
     idt[29] = set_gate((uint32_t) &interrupt_29);
     idt[30] = set_gate((uint32_t) &interrupt_30);
     idt[31] = set_gate((uint32_t) &interrupt_31);
-    idt[32] = set_gate((uint32_t) &timer_handler); // timer!!
+    idt[32] = set_gate((uint32_t) &interrupt_32); // remove me
+//    idt[32] = set_gate((uint32_t) &timer_handler); // timer!!
+    
     idt[33] = set_gate((uint32_t) &kbd_handler); // keyboard!!
     idt[34] = set_gate((uint32_t) &interrupt_34);
     idt[35] = set_gate((uint32_t) &interrupt_35);

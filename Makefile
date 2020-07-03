@@ -3,8 +3,13 @@ HEADERS = $(wildcard kernel/*.h drivers/*.h)
 
 # Convert the *.c files to *.o
 OBJ = ${C_SOURCES:.c=.o}
+DEBUG_OBJ = ${C_SOURCES:.c=.debug.o}
 
 all: os_image
+
+dis: kernel.debug
+	/usr/local/Cellar/binutils/2.34/bin/objdump -S -d kernel.debug > dis.txt
+
 
 # TODO: if e.g. switch_to_pm.asm changes, 'make run' will not refresh
 # properly. need to run make clean.
@@ -14,6 +19,8 @@ run: all
 	# useful: memory_region*
 	#	-d in_asm,op,trace:memory_region*,trace:guest_mem* 
 #	~/code/qemu/build/i386-softmmu/qemu-system-i386 -s 
+#	# useful:
+#	# -d in_asm,mmu,cpu_reset
 	qemu-system-i386 -d in_asm,mmu,cpu_reset \
 		-drive format=raw,file=os_image,index=0 \
 	-netdev user,id=mynet0,hostfwd=tcp::8080-:80 \
@@ -39,15 +46,24 @@ boot/bootloader.bin: boot/bootloader_entry.o boot/bootloader.o kernel/hardware.o
 kernel.bin: kernel/kernel_entry.o kernel/timer_irq.o kernel/fork.o ${OBJ}
 	i386-elf-ld -Ttext 0xc1000000 --oformat binary $^ -o $@
 
-# -mgeneral-regs-only lets you use __attribute__((interrupt))
+kernel.debug: kernel/kernel_entry.debug.o kernel/timer_irq.debug.o kernel/fork.debug.o ${DEBUG_OBJ}
+	i386-elf-ld -Ttext 0xc1000000 $^ -o $@
+
 %.o : %.c ${HEADERS}
 	i386-elf-gcc -mgeneral-regs-only -ffreestanding -c $< -o $@
+
+# -mgeneral-regs-only lets you use __attribute__((interrupt))
+%.debug.o : %.c ${HEADERS}
+	i386-elf-gcc -g -mgeneral-regs-only -ffreestanding -c $< -o $@
 
 # boot_sect.bin
 # kernel_entry.o, timer_handler.o
 %.o: %.asm
 	nasm $< -f elf -o $@
 
+%.debug.o: %.asm
+	nasm $< -f elf -o $@
+
 clean: 
-	rm -rf *.bin *.o os_image
+	rm -rf *.bin *.o os_image kernel.debug
 	rm -rf kernel/*.o boot/*.o boot/*.bin drivers/*.o

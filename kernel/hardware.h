@@ -28,4 +28,10 @@ void sys_exit();
     HALT();\
     } while (0);
 
-
+#define DUMP_STACK() do { \
+    uint32_t test;\
+    asm volatile ("mov %%esp, %0" : "=r" (test) :);\
+    print("esp: "); print_word(test);\
+    asm volatile ("mov %%ebp, %0" : "=r" (test) :);\
+    print("ebp: "); print_word(test);\
+    } while (0);

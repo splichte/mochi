@@ -3,82 +3,146 @@
 #include "../kernel/hardware.h"
 #include "../drivers/screen.h"
 
-static uint32_t page_directory[1024] __attribute__((aligned (4096)));
-static uint32_t page_table[1024] __attribute__((aligned (4096)));
-static uint32_t page_table_low[1024] __attribute__((aligned (4096)));
+// The page directory is located at the 
+// start at the 2nd page table, address 0x40.0000
+// we will use 2 page tables' worth of entries
+// to store the page directory + page table data.
+//
+// the page tables are 4096-byte (0x1000) chunks 
+// in a linear sequence from the base addr, 
+// which starts at 0x40.1000
+// each matches with the physical 4Mb chunk
+// (not the virtual chunk) it handles.
+// so for the Nth 4Mb chunk of physical RAM, 
+// the page table can be found at 0x40.1000 
+// + N * 0x1000. 
+//
+//
+uint32_t page_directory_addr = 0x400000;
+uint32_t *page_directory = (uint32_t *) 0x400000;
 
-void make_table(uint32_t *pt, uint32_t start_addr) {
+void set_pd_entry(uint16_t i, uint32_t pt_addr) {
+    page_directory[i] = pt_addr | 1;
+}
+
+void init_pt(uint32_t pt_addr, uint32_t start_addr) {
+    uint32_t *pt = (uint32_t *) pt_addr;
     for (int i = 0; i < 1024; i++) {
-        uint32_t i_addr = (uint32_t) (start_addr + (i * 0x1000));
+        uint32_t i_addr = start_addr + (i * 0x1000);
         pt[i] =  i_addr | 1;
     }
 }
 
-void set_pd_entry(uint16_t i, uint32_t *pt) {
-    page_directory[i] = ((uint32_t) pt) | 1;
-}
-
-/* we have to fix all the pointers before we set up the MMU, 
- * since our addresses are all messed up pre-MMU. 
- * make_table_pre_mmu and set_pd_entry_pre_mmu do this. */
-void make_table_pre_mmu(uint32_t *pt, uint32_t start_addr) {
-    uint32_t real_pt = ((uint32_t) pt);
-    make_table((uint32_t *) real_pt, start_addr);
-}
-
-void set_pd_entry_pre_mmu(uint16_t i, uint32_t *pt) {
-    uint32_t real_pt_addr = ((uint32_t) pt);
-    uint32_t real_pd = ((uint32_t) page_directory);
-    uint32_t *rpd = (uint32_t *) real_pd;
-    rpd[i] = real_pt_addr | 1;
-}
-
-
 void set_initial_page_tables() {
-    // we have bits 22-31. (10 bits) for the dir
+    // ==== Intel MMU Notes
+    //
+    // We have bits 22-31. (10 bits) for the dir
     // bits 12-21 (10 bits) for the page
     // and bits 0-11 (12 bits) for the offset.
+    //
+    // So when you see a line below like:
+    //      `uint16_t pd_vlow_i = 768; // 0xc000.0000`
+    // 768, the index into the 1024-entry page directory
+    // (1024 entries since 2^10 == 1024),
+    // is obtained by taking the most significant 10 bits
+    // from the desired virtual address 0xc000.0000. 
 
-    make_table_pre_mmu(page_table_low, 0x0);
-    make_table_pre_mmu(page_table, 0x01000000);
 
-    set_pd_entry_pre_mmu(0, page_table_low);
+    // 0x1000 == 4096 (the size of the page directory and page tables
+    // in bytes)
+    uint32_t pt_base_addr = page_directory_addr + 0x1000;
 
-    set_pd_entry_pre_mmu(4, page_table);
-    // 0xc1000000, where we set text section of kernel
-    set_pd_entry_pre_mmu(772, page_table);
+    // ==== Low Pages (Screen)
+    //
+    // physical address range: 0x0000.0000 to 0x0040.0000
+    // virtual address range: 0xc000.0000 to 0xc040.0000
+    //
+    // identity-mapped.
+    //
+    // this covers the video address 0xb8000 (see drivers/screen.c)
 
-    // 1100 0001 00
+    uint16_t pd_plow_i = 0; // 0x0000.0000
+    uint16_t pd_vlow_i = 768; // 0xc000.0000
+
+    uint32_t pt_low_addr = pt_base_addr;
+    init_pt(pt_low_addr, 0x0);
+
+    set_pd_entry(pd_plow_i, pt_low_addr);
+    set_pd_entry(pd_vlow_i, pt_low_addr);
+
+
+    // ==== Kernel Pages
+    //
+    // physical address range: 0x0100.0000 to 0x0140.0000
+    // virtual address range: 0xc100.0000 to 0xc140.0000
+    //
+    // identity-mapped.
+
+    uint16_t pd_pkernel_i = 4; // 0x0100.0000
+    uint16_t pd_vkernel_i = 772; // 0xc100.0000
+
+    uint32_t pt_kernel_addr = pt_base_addr + pd_pkernel_i * 0x1000;
+    init_pt(pt_kernel_addr, 0x01000000);
+
+    set_pd_entry(pd_pkernel_i, pt_kernel_addr);
+    set_pd_entry(pd_vkernel_i, pt_kernel_addr);
+
+
+    // ==== Page Directory + Page Table Pages
+    //
+    // physical address range: 0x40.0000 to 0x80.0000
+    // virtual address range: 0xc040.0000 to 0xc0c0.0000
+    //
+    // NOT identity-mapped. 
+    // we don't need to identity-map the physical address range.
+    //
+
+    // first page we need (0x40.0000 to 0x80.0000)
+    uint16_t pd_pt_i = 1;
+    uint16_t pd_vpt_i = 769; // 0xc040.0000
+    uint32_t pt_page_addr = pt_base_addr + pd_pt_i * 0x1000;
+    init_pt(pt_page_addr, 0x400000);
+    set_pd_entry(pd_vpt_i, pt_page_addr);
+
+    // second page we need (0x80.0000 to 0xc0.0000)
+    pd_vpt_i++;
+    pt_page_addr += 0x1000;
+    init_pt(pt_page_addr, 0x800000);
+    set_pd_entry(pd_vpt_i, pt_page_addr);
+
+
+
+    // ==== Stack Pages (ebp + esp) (in virtual memory)
+    //
+    // physical address range: 0x0180.0000 to 0x01c0.0000 
+    // virtual address range: 0xf000.0000 to 0xf040.0000
+    //
+    // NOT identity-mapped.
+    //
+    // 0x0180.0000 is at roughly 24Mb in RAM.
+    // it gives 0x0100.0000 to 0x0100.0000, or 8Mb, for 
+    // the kernel.
+    //
+    // if the virtual address is changed, make sure to change
+    // kernel_entry.asm (which sets ebp + esp)
+
+    uint16_t pd_pstack_i = 6; // 0x0180.0000
+    uint16_t pd_vstack_i = 960; // 0xf000.0000
+    uint32_t pt_stack_addr = pt_base_addr + pd_pstack_i * 0x1000;
+    init_pt(pt_stack_addr, 0x01800000); 
+    set_pd_entry(pd_vstack_i, pt_stack_addr);
 }
 
 void setup_vmem() {
     set_initial_page_tables();
 
-    uint32_t real_page_dir_addr = ((uint32_t) page_directory);
-
-    asm volatile ("mov %0, %%eax" : : "r" (real_page_dir_addr));
+    asm volatile ("mov %0, %%eax" : : "r" (page_directory_addr));
 
     asm volatile ("mov %%eax, %%cr3\n\t"
                   "mov %%cr0, %%eax\n\t" 
                   "or $0x80000000, %%eax\n\t"
                   "mov %%eax, %%cr0" ::);
 
-    // why do we need to translate? shouldn't it be translating
-    // these higher addresses correctly?
-    // or maybe the MMU doesn't translate page table/page directory
-    // addresses (since it needs those to even start to translate...)
-
-    // we've loaded appropriately! now we can 
-    // add the other entries we need (for MMIO)
-//    make_table_pre_mmu(page_table_bar, 0xfebc0000);
-    make_table_pre_mmu(page_table_low, 0x0); 
-    // first 10 bits of 0xfebc: 1111111010 = 1018
-//    set_pd_entry_pre_mmu(1018, page_table_bar);
-    set_pd_entry_pre_mmu(768, page_table_low);
-
-    // refresh cr3
-    asm volatile ("mov %%cr3, %%eax\n\t"
-                "mov %%eax, %%cr3" : :);
 }
 
 
@@ -108,9 +172,6 @@ int main() {
     // "sectors to read" can be at max 2^8 - 1 = 255
     uint8_t chunk_size = 1;
 
-    // okay, so. changing the chunk size is doing something
-    // interesting affecting the behavior...
-
     for (; i < SECTORS_TO_READ; i += chunk_size) {
         buf  = (uint8_t *) (KERNEL_ENTRY + (i - KERNEL_START_SECTOR) * DISK_SECTOR_SIZE);
         disk_read_bootloader(i, buf, chunk_size);
@@ -125,7 +186,6 @@ int main() {
 
     // jump to start of kernel and execute from there. 
     uint32_t start_addr = KERNEL_ENTRY + KERNEL_OFFSET;
-
 
     print("about to jump.\n");
     print_word(start_addr);

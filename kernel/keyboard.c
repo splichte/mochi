@@ -33,7 +33,7 @@ uint16_t scancodes[255] = {
     'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', 
     '`', SHIFT_IN, MISSING, 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', 
     '.', '/', SHIFT_IN, MISSING, ALT, ' ', ESC,
-    
+
     [170] = SHIFT_OUT, [182] = SHIFT_OUT,
 };
 

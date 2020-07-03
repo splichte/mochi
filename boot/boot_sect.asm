@@ -19,7 +19,6 @@ NEXT_BLOCK_OFFSET equ 0x1000    ; memory offset where we'll load next block
     ; jump to next block
     jmp NEXT_BLOCK_OFFSET
 
-; damn. we can't address high enough to make this easy.
 load_next_block:
     mov bx, NEXT_BLOCK_OFFSET
     mov dh, 32                  ; 16kb = 0x4000

@@ -48,7 +48,6 @@
 #define ATA_CACHE_FLUSH         0xe7 // toaruos
 
 // uses LBA (Logical Block Addressing) to talk to hard drive. 
-
 static void ata_wait_until_status(uint8_t desired_status) {
     uint8_t status;
     do {
@@ -56,8 +55,30 @@ static void ata_wait_until_status(uint8_t desired_status) {
     } while (!(status & desired_status));
 }
 
+void disk_write_sector(uint64_t lba, uint8_t *buf, uint16_t nchar);
+
+void disk_write(uint32_t lba, uint8_t *buf, uint32_t nchar) {
+    uint32_t chars_remaining = nchar;
+    uint8_t *c_buf = buf;
+    uint32_t c_lba = lba;
+    for (; chars_remaining > 0; chars_remaining -= ATA_SECTOR_SIZE, c_buf += ATA_SECTOR_SIZE, c_lba += 1) {
+        uint16_t chars_to_write = ATA_SECTOR_SIZE;
+        if (chars_remaining < ATA_SECTOR_SIZE) {
+            chars_to_write = chars_remaining;
+        }
+
+        disk_write_sector(c_lba, c_buf, chars_to_write);
+
+    }
+
+}
+
 /* WARNING: buf must exist and be big enough to write a full sector! */
-void disk_write(uint64_t lba, uint8_t *buf) {
+void disk_write_sector(uint64_t lba, uint8_t *buf, uint16_t nchar) {
+    if (nchar > ATA_SECTOR_SIZE) {
+        print("Bad write\n");
+        return;
+    }
     // stop interrupts
     asm volatile ("cli");
 
@@ -82,9 +103,21 @@ void disk_write(uint64_t lba, uint8_t *buf) {
     // command: write with retry
     port_byte_out(ATA_COMMAND_REGISTER, ATA_WRITE_WITH_RETRY);
 
-    ata_wait_until_status(ATA_STATUS_DATA_TRANSFER_REQUESTED);
+    // do I need to wait until data transfer requested? 
+    // if we don't do this wait, it always works.
 
-    port_multiword_out(ATA_DATA_REGISTER, buf, ATA_SECTOR_SIZE / 2);
+//    ata_wait_until_status(ATA_STATUS_DATA_TRANSFER_REQUESTED);
+
+    port_multiword_out(ATA_DATA_REGISTER, buf, nchar / 2);
+
+    if (nchar % 2 != 0) {
+        // pad with 0, so we can call port_word_out.
+        // and not port_byte_out
+        //
+        // TODO: test this! make sure the order is correct.
+        uint16_t word = buf[nchar - 1];
+        port_word_out(ATA_DATA_REGISTER, word);
+    }
 
     port_byte_out(ATA_COMMAND_REGISTER, ATA_CACHE_FLUSH);
 
@@ -94,7 +127,6 @@ void disk_write(uint64_t lba, uint8_t *buf) {
         // uh oh!
         print("Error writing disk...");
     }
-
     // re-enable interrupts
     asm volatile ("sti");
 }

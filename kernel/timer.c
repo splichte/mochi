@@ -40,7 +40,10 @@ process *next_process(process *p) {
 }
 
 void timer_handler_inner(registers r) {
+
     pause_interrupts();
+
+    HALT();
 
     // ignoring drift for right now...
     if (++timer_subticks == SUBTICKS_PER_TICK) {

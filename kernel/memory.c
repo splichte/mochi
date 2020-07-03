@@ -139,8 +139,6 @@ void free_page(uint32_t addr) {
 // there are 1024 page tables. 
 static uint32_t pt_bitmap[32];
 
-
-
 void set_pt_bit(uint16_t i) {
     uint8_t val = i / 32;
     uint8_t offset = i % 32;
@@ -150,7 +148,8 @@ void set_pt_bit(uint16_t i) {
 uint8_t get_pt_bit(uint16_t i) {
     uint8_t val = i / 32;
     uint8_t offset = i % 32;
-    return (pt_bitmap[val] & (1 << offset));
+    uint32_t present = pt_bitmap[val] & (1 << offset);
+    return (present > 0);
 }
 
 // get the address of a free page table.
@@ -160,6 +159,7 @@ uint32_t *get_free_page_table() {
         if (get_pt_bit(i) ^ 1) {
             set_pt_bit(i);
 
+            // do we have to correct this? 
             return pt_at_index(i);
         }
     }
@@ -175,10 +175,10 @@ uint32_t *get_free_page_table() {
 uint8_t map_free_page(uint32_t virtual_addr) {
     uint16_t pd_i = virtual_addr >> 22;
     uint16_t pt_i = (virtual_addr >> 12) & 0x3ff; // 0011 1111 1111
-    print("looking for page directory index: ");
-    print_word(pd_i);
-    print("page table index: ");
-    print_word(pt_i);
+//    print("looking for page directory index: ");
+//    print_word(pd_i);
+//    print("page table index: ");
+//    print_word(pt_i);
 
     // get a free physical page. 
     // TODO: this should be able to fail.
@@ -195,11 +195,10 @@ uint8_t map_free_page(uint32_t virtual_addr) {
     // entry not present. 
     if (pd_entry ^ 0x1) {
         // get a free page table (using bitmap)
-        print("getting free page table...\n");
         uint32_t *pt = get_free_page_table();
 
         // update page directory with this new table!
-        pd[pd_i] = ((uint32_t) pt) | 1;
+        pd[pd_i] = ((uint32_t) pt - 0xc0000000) | 1;
 
         // set the physical page 
         pt[pt_i] = phy_page_addr | 1;
@@ -225,6 +224,14 @@ uint8_t map_free_page(uint32_t virtual_addr) {
 }
 
 void zero_page_directory() {
+    // from bootloader. the page tables
+    // that had "init pt" called on them.
+    set_pt_bit(0);
+    set_pt_bit(1);
+    set_pt_bit(2);
+    set_pt_bit(4);
+    set_pt_bit(6);
+
     for (int i = 0; i < N_PAGE_TABLES; i++) {
         // we've set these entries:
         // 0, 1, 4, 6, 768, 769, 772, 960
@@ -233,6 +240,7 @@ void zero_page_directory() {
         switch(i) {
             case 0:
             case 1:
+            case 2:
             case 4:
             case 6:
             case 768:

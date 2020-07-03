@@ -12,17 +12,22 @@
 __attribute__ ((interrupt))
 void page_fault_handler(struct interrupt_frame *frame, uint32_t error_code) {
     asm volatile ("cli");
-    print("exception #14!\n");
+//    print("exception #14!\n");
     uint32_t mem_addr;
     asm volatile ("mov %%cr2, %%eax\n\t"
             "mov %%eax, %0" : "=r" (mem_addr) :); 
 
-    print("attempted to access: "); print_word(mem_addr); 
+//    print("attempted to access: "); print_word(mem_addr); 
+    // so, this isn't working...lol
     map_free_page(mem_addr);
 
     // TODO: if all pages used, evict some page
 
-    HALT();
+    // do we need to reload cr3?
+//    asm volatile ("mov %%cr3, %%eax\n\t"
+//            "mov %%eax, %%cr3"::);
+
+//    HALT();
     asm volatile ("sti");
 
 }

@@ -21,7 +21,7 @@ run: all
 #	~/code/qemu/build/i386-softmmu/qemu-system-i386 -s 
 #	# useful:
 #	# -d in_asm,mmu,cpu_reset
-	qemu-system-i386 -d in_asm,mmu,cpu_reset \
+	qemu-system-i386 \
 		-drive format=raw,file=os_image,index=0 \
 	-netdev user,id=mynet0,hostfwd=tcp::8080-:80 \
 	-device e1000,netdev=mynet0 \
@@ -49,10 +49,10 @@ kernel.bin: kernel/kernel_entry.o kernel/timer_irq.o kernel/fork.o ${OBJ}
 kernel.debug: kernel/kernel_entry.debug.o kernel/timer_irq.debug.o kernel/fork.debug.o ${DEBUG_OBJ}
 	i386-elf-ld -Ttext 0xc1000000 $^ -o $@
 
+# -mgeneral-regs-only lets you use __attribute__((interrupt))
 %.o : %.c ${HEADERS}
 	i386-elf-gcc -mgeneral-regs-only -ffreestanding -c $< -o $@
 
-# -mgeneral-regs-only lets you use __attribute__((interrupt))
 %.debug.o : %.c ${HEADERS}
 	i386-elf-gcc -g -mgeneral-regs-only -ffreestanding -c $< -o $@
 

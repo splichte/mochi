@@ -1,5 +1,6 @@
 #include "disk.h"
 #include "screen.h"
+#include "../kernel/fs.h" // temporary!
 #include "../kernel/hardware.h"
 
 // Talk to hard disk using ATA (Advanced Technology Attachment)
@@ -22,15 +23,14 @@
 
 #define ATA_SECTOR_SIZE 512
 
-// ATA statuses ( "port_byte_in(ATA_STATUS_REGISTER)" )
+
+// T13/1410D revision 3b
 #define ATA_STATUS_BUSY                     (1 << 7)
 #define ATA_STATUS_READY                    (1 << 6)
 #define ATA_STATUS_DEVICE_FAULT             (1 << 5)
-#define ATA_STATUS_SEEK_COMPLETE            (1 << 4)
 #define ATA_STATUS_DATA_TRANSFER_REQUESTED  (1 << 3)
-#define ATA_STATUS_DATA_CORRECTED           (1 << 2)
-#define ATA_STATUS_INDEX_MARK               (1 << 1)
 #define ATA_STATUS_ERR                      (1 << 0)
+
 
 // ATA errors ( "port_byte_in(ATA_ERR_REGISTER" )
 #define ATA_ERROR_BAD_BLOCK                 (1 << 7)
@@ -44,10 +44,16 @@
 
 // ATA commands
 #define ATA_READ_WITH_RETRY     0x20 // osdev
-#define ATA_WRITE_WITH_RETRY    0x30 // osdev
+#define ATA_WRITE_WITH_RETRY    0x30 // osdev. see page 303 of ATA v6 spec.
 #define ATA_CACHE_FLUSH         0xe7 // toaruos
 
-// uses LBA (Logical Block Addressing) to talk to hard drive. 
+static void ata_wait_until_not_busy() {
+    uint8_t status;
+    do {
+        status = port_byte_in(ATA_STATUS_REGISTER);
+    } while (status & ATA_STATUS_BUSY);
+}
+
 static void ata_wait_until_status(uint8_t desired_status) {
     uint8_t status;
     do {
@@ -55,30 +61,54 @@ static void ata_wait_until_status(uint8_t desired_status) {
     } while (!(status & desired_status));
 }
 
-void disk_write_sector(uint64_t lba, uint8_t *buf, uint16_t nchar);
+static void waste_cycle_time() {
+    // page 337
+    port_byte_in(ATA_ALT_STATUS_REGISTER);
+}
+
+void disk_write_sector(uint32_t lba, uint8_t *buf, uint16_t nchar);
 
 void disk_write(uint32_t lba, uint8_t *buf, uint32_t nchar) {
-    uint32_t chars_remaining = nchar;
+    uint32_t chars_written = 0;
     uint8_t *c_buf = buf;
     uint32_t c_lba = lba;
-    for (; chars_remaining > 0; chars_remaining -= ATA_SECTOR_SIZE, c_buf += ATA_SECTOR_SIZE, c_lba += 1) {
+    for (; chars_written < nchar; c_buf += ATA_SECTOR_SIZE, c_lba += 1) {
         uint16_t chars_to_write = ATA_SECTOR_SIZE;
-        if (chars_remaining < ATA_SECTOR_SIZE) {
-            chars_to_write = chars_remaining;
+        if ((nchar - chars_written) < ATA_SECTOR_SIZE) {
+            chars_to_write = nchar - chars_written;
         }
 
         disk_write_sector(c_lba, c_buf, chars_to_write);
 
+        chars_written += chars_to_write;
     }
-
 }
 
-/* WARNING: buf must exist and be big enough to write a full sector! */
-void disk_write_sector(uint64_t lba, uint8_t *buf, uint16_t nchar) {
+
+/* NOTE: if you don't write a full sector 
+ * in port_multiword_out, it will somehow leave the disk in 
+ * a bad state that causes subsequent commands to silently fail.
+ * (e.g. a read returning all 0s)
+ */
+void disk_write_sector(uint32_t lba, uint8_t *in_buf, uint16_t nchar) {
     if (nchar > ATA_SECTOR_SIZE) {
         print("Bad write\n");
         return;
     }
+
+    uint8_t buf[ATA_SECTOR_SIZE];
+    // if given buf size is less than ATA_SECTOR_SIZE, 
+    // pad out to 512. 
+    // TODO: inefficient
+    int i = 0;
+    for (; i < nchar; i++) {
+        buf[i] = in_buf[i]; 
+    }
+
+    for (; i < ATA_SECTOR_SIZE; i++) {
+        buf[i] = 0;
+    }
+
     // stop interrupts
     asm volatile ("cli");
 
@@ -86,7 +116,7 @@ void disk_write_sector(uint64_t lba, uint8_t *buf, uint16_t nchar) {
     ata_wait_until_status(ATA_STATUS_READY);
 
     // https://wiki.osdev.org/ATA_read/write_sectors
-    port_byte_out(ATA_DRIVE_HEAD_REGISTER, 0xe0); // LBA mode, apparently
+    port_byte_out(ATA_DRIVE_HEAD_REGISTER, 0xe0); // LBA mode
 
     // send # of sectors to write (1, in this case)
     port_byte_out(ATA_SECTOR_COUNT_REGISTER, 0x01);
@@ -103,23 +133,17 @@ void disk_write_sector(uint64_t lba, uint8_t *buf, uint16_t nchar) {
     // command: write with retry
     port_byte_out(ATA_COMMAND_REGISTER, ATA_WRITE_WITH_RETRY);
 
-    // do I need to wait until data transfer requested? 
-    // if we don't do this wait, it always works.
+    // read alternate status register and ignore result
+    waste_cycle_time();
 
-//    ata_wait_until_status(ATA_STATUS_DATA_TRANSFER_REQUESTED);
+    ata_wait_until_status(ATA_STATUS_DATA_TRANSFER_REQUESTED);
 
-    port_multiword_out(ATA_DATA_REGISTER, buf, nchar / 2);
+    port_multiword_out(ATA_DATA_REGISTER, buf, ATA_SECTOR_SIZE / 2);
 
-    if (nchar % 2 != 0) {
-        // pad with 0, so we can call port_word_out.
-        // and not port_byte_out
-        //
-        // TODO: test this! make sure the order is correct.
-        uint16_t word = buf[nchar - 1];
-        port_word_out(ATA_DATA_REGISTER, word);
-    }
-
+    // see osdev "cache flush"
     port_byte_out(ATA_COMMAND_REGISTER, ATA_CACHE_FLUSH);
+
+    ata_wait_until_not_busy();
 
     // check if an error was set:
     uint8_t status = port_byte_in(ATA_STATUS_REGISTER);
@@ -127,14 +151,15 @@ void disk_write_sector(uint64_t lba, uint8_t *buf, uint16_t nchar) {
         // uh oh!
         print("Error writing disk...");
     }
+
     // re-enable interrupts
     asm volatile ("sti");
 }
 
-// TODO: this is wrong. nsectors should always be 1. 
-void disk_read_internal(uint64_t lba, uint8_t *buf, uint8_t nsectors) {
+void disk_read_internal(uint32_t lba, uint8_t *buf, uint8_t nsectors) {
     // busy wait until disk is ready.
     ata_wait_until_status(ATA_STATUS_READY);
+    ata_wait_until_not_busy();
 
     // https://wiki.osdev.org/ATA_read/write_sectors
     // we want bits 5 and 7 set. 1010 0000. 
@@ -158,10 +183,14 @@ void disk_read_internal(uint64_t lba, uint8_t *buf, uint8_t nsectors) {
     // command: read with retry
     port_byte_out(ATA_COMMAND_REGISTER, ATA_READ_WITH_RETRY);
 
+    // wait until not busy
+    ata_wait_until_not_busy();
+
     for (int i = 0; i < nsectors; i++) {
         ata_wait_until_status(ATA_STATUS_DATA_TRANSFER_REQUESTED);
         port_multiword_in(ATA_DATA_REGISTER, (uint8_t *)(buf + i*ATA_SECTOR_SIZE), ATA_SECTOR_SIZE / 2);
     }
+    ata_wait_until_not_busy();
 
     // check if an error was set:
     uint8_t status = port_byte_in(ATA_STATUS_REGISTER);
@@ -169,6 +198,7 @@ void disk_read_internal(uint64_t lba, uint8_t *buf, uint8_t nsectors) {
         // uh oh!
         print("Error reading disk... (2)");
     }
+
 }
 
 /* disk read function for use before interrupts are ready.
@@ -176,12 +206,12 @@ void disk_read_internal(uint64_t lba, uint8_t *buf, uint8_t nsectors) {
 
 /* TODO: this doesn't need to be bootloader-specific. 
  * reading big chunks from disk is generally useful...*/
-void disk_read_bootloader(uint64_t lba, uint8_t *buf, uint8_t chunk) {
+void disk_read_bootloader(uint32_t lba, uint8_t *buf, uint8_t chunk) {
     disk_read_internal(lba, buf, chunk);
 }
 
 /* WARNING: disk_read assumes buf has enough space for the read! */
-void disk_read(uint64_t lba, uint8_t *buf) {
+void disk_read(uint32_t lba, uint8_t *buf) {
     // stop interrupts
     asm volatile ("cli");
 

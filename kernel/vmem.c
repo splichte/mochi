@@ -3,7 +3,6 @@
 #include "devices.h"
 #include "../drivers/screen.h"
 
-
 // we need to handle the mappings properly. 
 // right now we have some memory that's somewhere. 
 // how on earth do we fix up the page tables 
@@ -18,8 +17,6 @@ void page_fault_handler(struct interrupt_frame *frame, uint32_t error_code) {
     uint32_t mem_addr;
     asm volatile ("mov %%cr2, %%eax\n\t"
             "mov %%eax, %0" : "=r" (mem_addr) :); 
-
-//    print("attempted to access: "); print_word(mem_addr); 
 
     map_free_page(mem_addr);
 

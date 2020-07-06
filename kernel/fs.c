@@ -60,6 +60,8 @@ superblock make_super(uint16_t block_group_nr) {
     b.s_first_ino = EXT2_GOOD_OLD_FIRST_INO;
     b.s_inode_size = EXT2_GOOD_OLD_INODE_SIZE; 
     b.s_block_group_nr = block_group_nr;
+
+    return b;
 }
 
 /* write superblock using default Mochi values. */
@@ -98,16 +100,19 @@ void write_bgdt(uint32_t addr, bg_desc *table) {
         sys_exit();
     }
 
+    // should we pad to a full block?
     disk_write(addr, (uint8_t *) table, N_BLOCK_GROUPS * sizeof(bg_desc));
 }
 
 int disk_read_blk(uint32_t block_num, uint8_t *buf) {
-    if (!fs_start_set) return -1;
+    if (!fs_start_set) return 1;
 
     uint32_t lba = filesys_start + block_num * SECTORS_PER_BLOCK;
+
     for (int i = 0; i < SECTORS_PER_BLOCK; i++) {
         disk_read(lba + i, buf + DISK_SECTOR_SIZE * i);
     }
+    return 0;
 }
 
 int disk_write_blk(uint32_t block_num, uint8_t *buf) {
@@ -195,7 +200,6 @@ void disk_sync_super() {
 
 // TODO: should be given a superblock or some argument
 int first_free_block_num(uint32_t *res) {
-    // oh, we already have BGDT. we don't need to read...
     for (int i = 0; i < N_BLOCK_GROUPS; i++) {
         bg_desc d = bgdt[i];
         uint16_t n_free_blocks = d.bg_free_blocks_count;
@@ -209,26 +213,13 @@ int first_free_block_num(uint32_t *res) {
     return -1;
 }
 
-// TODO: cache the block group descriptors, or something.
-// have disk_read_blk do it?
-// hmm, no, then you still need to do the dumb
-// n_skip_blocks. would be better to have a linked list.
 int first_free_inode_num(uint32_t *res) {
-    // +2 because we skip the first block (boot sector)
-    // and the superblock.
-    uint32_t n_skip_blocks = 2;
-
-    uint8_t buf[sizeof(bg_desc)];
     for (int i = 0; i < N_BLOCK_GROUPS; i++) {
-        uint32_t bgd_blkno = i + n_skip_blocks;
-
-        // read block group descriptor entry
-        disk_read_blk(bgd_blkno, buf);
-        bg_desc *d = (bg_desc *) buf;
-        uint16_t n_free_inodes = d->bg_free_inodes_count;
+        bg_desc d = bgdt[i];
+        uint16_t n_free_inodes = d.bg_free_inodes_count;
         if (n_free_inodes == 0) continue;
 
-        *res = first_free_inode(d);
+        *res = first_free_inode(&d);
         return 0;
     }
 
@@ -418,23 +409,29 @@ uint32_t read_superblock() {
 
 void set_superblock() {
     // set superblock 
-    uint8_t sb_buf[sizeof(superblock)];
-    if (!disk_read_blk(1, sb_buf)) {
+    superblock b;
+    if (disk_read_blk(1, (uint8_t *) &b)) {
         print("Failed to read superblock.\n");
         sys_exit();
     }
 
-    super = *((superblock *) sb_buf);
+    super = b;
 }
 
 void set_bgdt() {
     uint32_t bgdt_start_blkno = 2;
-    uint8_t *buf = (uint8_t *) bgdt;
+    uint8_t buf[EXT2_BLK_SIZE];
 
     // the BGDT fits in 1 disk block 
     // if we have < (1024 / 32) block groups
     // (which we do)
     disk_read_blk(bgdt_start_blkno, buf);
+
+    // copy into bgdt
+    uint8_t *bgdt_buf = (uint8_t *) bgdt;
+    for (int i = 0; i < N_BLOCK_GROUPS * sizeof(bg_desc); i++) {
+        bgdt_buf[i] = buf[i];
+    }
 }
 
 // TODO: it's super confusing to have the things
@@ -461,7 +458,6 @@ void mkfs(uint32_t mb_start, uint32_t len) {
     // create a superblock.
     superblock b = make_super(0);
 
-    print_word(write_addr);
     write_superblock(write_addr, b);
 
     // make + write the backup superblock
@@ -478,19 +474,14 @@ void mkfs(uint32_t mb_start, uint32_t len) {
     // otherwise you will always need to run "mkfs" before doing any
     // filesystem operation...
     make_bgdt(to_write_bgdt);
-    print("finished makes\n");
+
     write_bgdt(write_addr, to_write_bgdt);
 
-    print("wrote once\n");
     // write backup bgdt
     write_bgdt(write_addr + SECTORS_PER_BLOCK_GROUP, to_write_bgdt);
 
-    print("done with all writes\n");
-
     // start of where we assume we have these things!
     set_as_fs(mb_start);
-
-    print("c\n");
 
     create_root_directory();
 }

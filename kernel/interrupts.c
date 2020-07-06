@@ -25,42 +25,51 @@
 
 #define EXCEPTION(i) \
      __attribute__((interrupt)) \
+    void interrupt_##i(struct interrupt_frame *frame) { \
+        asm volatile ("cli"); \
+        print("exception #: "); print_byte(i);\
+        print("instruction: "); \
+        print_word(frame->ip);\
+        HALT();\
+        asm volatile ("sti"); \
+    } \
+
+
+#define EXCEPTION_ERRCODE(i) \
+     __attribute__((interrupt)) \
     void interrupt_##i(struct interrupt_frame *frame, uint32_t error_code) { \
         asm volatile ("cli"); \
         print("exception #: "); print_byte(i);\
         print("instruction: "); \
         print_word(frame->ip);\
-        print("cs: "); print_word(frame->cs);\
-        uint32_t test; \
-        asm volatile ("mov %%cr2, %%eax\n\t"\
-                "mov %%eax, %0" : "=r" (test) :); \
-        print("attempted to access: "); print_word(test); \
         HALT();\
         asm volatile ("sti"); \
     } \
 
-EXCEPTION(0);
-EXCEPTION(1);
-EXCEPTION(2);
-EXCEPTION(3);
-EXCEPTION(4);
-EXCEPTION(5);
-EXCEPTION(6);
-EXCEPTION(7);
-EXCEPTION(8);
-EXCEPTION(9);
-EXCEPTION(10);
-EXCEPTION(11);
-EXCEPTION(12);
-EXCEPTION(13);
+
+// all codes from https://wiki.osdev.org/Exceptions
+EXCEPTION(0); // divide-by-zero
+EXCEPTION(1); // debug
+EXCEPTION(2); // non-maskable interrupt
+EXCEPTION(3); // breakpoint
+EXCEPTION(4); // overflow
+EXCEPTION(5); // bound range exceeded
+EXCEPTION(6); // invalid opcode
+EXCEPTION(7); // device not available
+EXCEPTION_ERRCODE(8); // double fault
+EXCEPTION(9); // obsolete
+EXCEPTION_ERRCODE(10); // invalid TSS
+EXCEPTION_ERRCODE(11); // segment not present
+EXCEPTION_ERRCODE(12); // stack-segment fault
+EXCEPTION_ERRCODE(13); // general protection fault
 //EXCEPTION(14);    // page fault (vmem handler)
-EXCEPTION(15);
-EXCEPTION(16);
-EXCEPTION(17);
-EXCEPTION(18);
-EXCEPTION(19);
-EXCEPTION(20);
-EXCEPTION(21);
+EXCEPTION(15);  // reserved
+EXCEPTION(16);  // x87 floating-point exception
+EXCEPTION_ERRCODE(17);  // alignment check
+EXCEPTION(18); // machine check
+EXCEPTION(19); // simd floating-point exception
+EXCEPTION(20);  // virtualization exception
+EXCEPTION(21);  // 21-29 are reserved
 EXCEPTION(22);
 EXCEPTION(23);
 EXCEPTION(24);
@@ -69,8 +78,9 @@ EXCEPTION(26);
 EXCEPTION(27);
 EXCEPTION(28);
 EXCEPTION(29);
-EXCEPTION(30);
-EXCEPTION(31);
+EXCEPTION_ERRCODE(30);  // security exception
+EXCEPTION(31); // reserved
+
 
 /* NOTE:
  *  Operation Command Byte 1 (in setup_descriptor_table) 
@@ -199,6 +209,7 @@ void setup_interrupt_descriptor_table() {
     // without a language that supports reflection!
     //
     // TODO: have these generated as part of build process.
+    idt[0] = set_gate((uint32_t) &interrupt_0);
     idt[1] = set_gate((uint32_t) &interrupt_1);
     idt[2] = set_gate((uint32_t) &interrupt_2);
     idt[3] = set_gate((uint32_t) &interrupt_3);
@@ -252,8 +263,6 @@ void setup_interrupt_descriptor_table() {
     for (int i = 48; i < N_IDT_ENTRIES; i++) {
         idt[i] = set_gate((uint32_t) &null_interrupt);
     }
-    idt_gate zero = { 0, 0, 0, 0 };
-    idt[0] = zero;
 
     // load IDT register
     idtr.idt_base = (uint32_t) idt;

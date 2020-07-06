@@ -5,6 +5,6 @@
 
 // disk commands
 void disk_write(uint32_t lba, uint8_t *buf, uint32_t nchar);
-void disk_read(uint64_t lba, uint8_t *buf);
-void disk_read_bootloader(uint64_t lba, uint8_t *buf, uint8_t chunk);
+void disk_read(uint32_t lba, uint8_t *buf);
+void disk_read_bootloader(uint32_t lba, uint8_t *buf, uint8_t chunk);
 

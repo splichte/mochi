@@ -48,6 +48,7 @@
 #define EXT2_BOOT_LOADER_INO    5
 #define EXT2_UNDEL_DIR_INO      6
 
+#define EXT2_FREE_INO_START     11
 /* i_mode */
 
 /* file format */
@@ -76,6 +77,15 @@
 #define EXT2_S_IXOTH    0x0001      // others execute
 
 
+/* Table 4.2: Defined Inode File Type Values */
+#define EXT2_FT_UNKNOWN     0
+#define EXT2_FT_REG_FILE    1
+#define EXT2_FT_DIR         2
+#define EXT2_FT_CHRDEV      3
+#define EXT2_FT_BLKDEV      4
+#define EXT2_FT_FIFO        5
+#define EXT2_FT_SOCK        6
+#define EXT2_FT_SYMLINK     7
 
 
 /* located at byte offset 1024
@@ -190,10 +200,17 @@ typedef struct _dentry {
     uint16_t rec_len;
     uint8_t name_len;
     uint8_t file_type;
+    char name[255]; // wasteful, but whatever!
 } dentry;
 
 
 // make an ext2 filesystem on the disk.
 // args are in Mb
 void mkfs(uint32_t offset, uint32_t len);
+
+
+// given a "path", print the directory contents
+void cat(char *path);
+
+
 

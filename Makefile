@@ -7,7 +7,7 @@ DEBUG_OBJ = ${C_SOURCES:.c=.debug.o}
 
 all: os_image
 
-dis: kernel.debug
+debug: kernel.debug
 	/usr/local/Cellar/binutils/2.34/bin/objdump -S -d kernel.debug > dis.txt
 
 

@@ -10,10 +10,10 @@
 #include <stddef.h>
 
 void test_sb_writes() {
-    superblock out = { 0 };
+    superblock_t out = { 0 };
     out.s_inodes_count = 12;
 
-    superblock in = { 0 };
+    superblock_t in = { 0 };
 
     uint32_t lba = 0x00004002; 
 
@@ -82,8 +82,6 @@ void test_image_persists() {
 extern pid_t fork();
 
 int kmain() {
-//    clear_screen();
-
     notify_screen_mmu_on();
     clear_screen();
 
@@ -98,18 +96,17 @@ int kmain() {
 //    test_sb_writes();
 //    finish_vmem_setup();
 
-//    HALT();
-
     print("Welcome to Mochi ^_^ \n");
     print(">");
 
     mkfs(8, 24);
 
-    print("done!\n");
+    test_fs();
+
     // turned these off for now...since we have virtual memory 
     // turned on.
-    transmit_initialization();
-    test_transmit();
+//    transmit_initialization();
+//    test_transmit();
 
     // test processes.
 //    init_root_process();

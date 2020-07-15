@@ -9,26 +9,7 @@
 
 #define ROOT_USR    0
 
-#define EXT2_BLK_SIZE   1024
 #define EXT2_SUPER_MAGIC    0xef53
-
-// this is based off the 214-block, 1kb block-size 
-// that's in the sample 20kb ext2 filesystem
-// with our current values, it yields 1712 inodes per group.
-#define MOCHI_EXT2_INODES_PER_GROUP     ((214 * EXT2_BLK_SIZE) / sizeof(inode))
-
-// see "Sample 20mb Partition Layout"
-// subtracting off the blocks for block bitmap (1)
-// inode bitmap (1), inode table (214)
-#define MOCHI_EXT2_FREE_BLOCKS_PER_GROUP    7976
-
-// correct this for what the inode table uses
-#define MOCHI_EXT2_BLOCKS_PER_GROUP 8192
-
-#define SECTORS_PER_BLOCK   (EXT2_BLK_SIZE / DISK_SECTOR_SIZE)
-
-#define SECTORS_PER_BLOCK_GROUP (SECTORS_PER_BLOCK * MOCHI_EXT2_BLOCKS_PER_GROUP)
-
 
 #define EXT2_VALID_FS   1
 #define EXT2_ERROR_FS   2
@@ -154,7 +135,7 @@ typedef struct {
     uint32_t s_default_mount_options;
     uint32_t s_first_meta_bg;
     uint8_t reserved_future[760];
-} superblock;
+} superblock_t;
 
 /* Block group descriptor. 
  * The block group descriptor table 
@@ -171,7 +152,7 @@ typedef struct {
     uint16_t bg_pad;
 
     uint8_t bg_reserved[12];
-} bg_desc;
+} bgdesc_t;
 
 // 128 bytes
 typedef struct {
@@ -193,7 +174,7 @@ typedef struct {
     uint32_t i_dir_acl;
     uint32_t i_faddr;
     uint8_t i_osd2[12];
-} inode;
+} inode_t;
 
 typedef struct _dentry {
     uint32_t inode;
@@ -201,16 +182,24 @@ typedef struct _dentry {
     uint8_t name_len;
     uint8_t file_type;
     char name[255]; // wasteful, but whatever!
-} dentry;
+} dentry_t;
 
 
 // make an ext2 filesystem on the disk.
 // args are in Mb
 void mkfs(uint32_t offset, uint32_t len);
 
+// once the metadata is in place, creates the root directory.
+void finish_fs_init(uint32_t mb_start);
 
-// given a "path", print the directory contents
+
+// given a "path", print the file contents
 void cat(char *path);
 
+// cast mb to bytes, then divide by disk sector size (512)
+#define mb_to_lba(mb) (mb * 1024 * 2)
 
+void read_fs(uint32_t location);
+
+void test_fs();
 

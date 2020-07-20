@@ -176,12 +176,13 @@ typedef struct {
     uint8_t i_osd2[12];
 } inode_t;
 
+// 32, 32, 64 = 128
 typedef struct _dentry {
     uint32_t inode;
     uint16_t rec_len;
     uint8_t name_len;
     uint8_t file_type;
-    char name[255]; // wasteful, but whatever!
+    char name[64]; // wasteful, but whatever!
 } dentry_t;
 
 
@@ -193,13 +194,31 @@ void mkfs(uint32_t offset, uint32_t len);
 void finish_fs_init(uint32_t mb_start);
 
 
-// given a "path", print the file contents
-void cat(char *path);
-
 // cast mb to bytes, then divide by disk sector size (512)
 #define mb_to_lba(mb) (mb * 1024 * 2)
 
 void read_fs(uint32_t location);
 
 void test_fs();
+
+/* interface to the filesystem! */
+
+typedef uint32_t fd_t;      // file descriptor type
+
+// an open file.
+typedef struct {
+    inode_t *inode;      // the inode for this file.
+    fd_t fd;            // the file descriptor (is what, an index into the file table?)
+} file_t;
+
+// given a "path", print the file contents
+void cat(const char *path);
+
+// how to "make" a new file"?
+// I want to open a file for writing.
+
+// rename a file
+//int mkdir(const char *pathname);
+//int rmdir(const char *pathname);
+
 

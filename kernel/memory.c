@@ -8,22 +8,6 @@
 #define MEMORY_LIMIT            0x8000000
 #define MEMORY_LIMIT_IN_MB      128
 
-/* this is KERNEL_ENTRY + SECTORS_TO_READ * 512, 
- * from boot/bootloader.c. 
- * which is 0x1000000 + 524288
- * which is 0x1000000 + 0x80000
- */
-// we want 16Mb of clearance at the start for ISA devices, 
-// which is what linux defines as its DMA zone
-// (we reserve a 1Mb region, starting at 16Mb....)
-//
-#define KERNEL_START    0x1000000
-#define KERNEL_END      (KERNEL_START + 0x100000)
-
-// don't write too low, to avoid interrupts, BIOS, etc.
-// this wastes some mem but it's OK
-#define OK_MEM_START    0x1000000
-
 // TODO: we need space for the stack to grow downwards.
 // so maybe we should end a little lower?
 //

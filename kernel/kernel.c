@@ -85,7 +85,6 @@ int kmain() {
     notify_screen_mmu_on();
     clear_screen();
 
-
     // once we're in kernel, we need to immediately set the 
     // page tables to make sure we don't run out of memory.
     setup_memory();
@@ -94,7 +93,6 @@ int kmain() {
     setup_interrupt_descriptor_table();
 
 //    test_sb_writes();
-//    finish_vmem_setup();
 
     print("Welcome to Mochi ^_^ \n");
     print(">");

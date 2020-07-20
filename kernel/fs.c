@@ -5,6 +5,7 @@
 #include "fs.h"
 #include "hardware.h"
 #include "../drivers/disk.h"
+#include "kalloc.h"
 #include "string.h"
 
 #define S_BLOCK_SIZE    (1024 << super.s_log_block_size)
@@ -369,6 +370,72 @@ inode_t get_inode(uint32_t inode_n) {
     return blk_nodes[inode_blk_offset];
 }
 
+// get the ith data block for a file. 
+// hides all the "indirect block" stuff
+// at the cost of a bit of efficiency.
+//
+uint32_t get_data_block(inode_t file, uint32_t i) {
+    uint32_t dir_blk_len = 12;
+    if (i < dir_blk_len) {
+        return file.i_block[i];
+    }
+
+    uint32_t ind_blk_len = S_BLOCK_SIZE / sizeof(uint32_t);
+
+    if (i < dir_blk_len + ind_blk_len) {
+        uint32_t blocks[ind_blk_len];
+        disk_read_blk(file.i_block[12], (uint8_t *) blocks);
+        uint16_t j = i - dir_blk_len;
+        return blocks[j];
+    }
+
+    uint32_t dbl_ind_blk_len = S_BLOCK_SIZE * ind_blk_len;
+    if (i < dir_blk_len + ind_blk_len + dbl_ind_blk_len) {
+        uint32_t blocks[ind_blk_len];
+        disk_read_blk(file.i_block[13], (uint8_t *) blocks);
+
+        uint32_t j = i - dir_blk_len - ind_blk_len;
+
+        uint32_t ind_blk_index = j / ind_blk_len;
+        uint32_t blk_index = j % ind_blk_len;
+
+        disk_read_blk(blocks[ind_blk_index], (uint8_t *) blocks);
+
+        return blocks[blk_index];
+    }
+
+    // TODO: triply-independent.
+    // i.e. file needs more than 65536 1kb blocks, 
+    // so the file is greater than 65 Mb in size. 
+    // our OS is not at that point yet. 
+
+    return 0;
+}
+
+uint32_t get_dir_by_name(inode_t current_dir, const char *name) {
+    uint16_t max_blk_index = current_dir.i_blocks / (2 << super.s_log_block_size);
+
+    for (int i = 0; i < max_blk_index; i++) {
+        uint32_t data_block_n = get_data_block(current_dir, i);
+
+        // this only works because we've regularized the size of dentries.
+        uint16_t dentries_per_blk = S_BLOCK_SIZE / sizeof(dentry_t);
+
+        dentry_t dentries[dentries_per_blk];
+        disk_read_blk(data_block_n, (uint8_t *) dentries);
+
+        for (int i = 0; i < dentries_per_blk; i++) {
+            dentry_t d = dentries[i];
+            if (!strcmp(d.name, name)) {
+                // this is the match. 
+                return d.inode;
+            }
+        }
+    }
+    // we didn't find name. 
+    return 0; 
+}
+
 // TODO: just cache this, like we do with superblock.
 inode_t get_root_dir_inode() {
     return get_inode(EXT2_ROOT_INO);
@@ -521,8 +588,6 @@ int create_root_directory() {
 
 
 void set_initial_used_blocks() {
-    
-
     // how many blocks for inode table, in each block group?
     uint16_t inodes_per_block = S_BLOCK_SIZE / sizeof(inode_t);
     uint32_t inode_table_blocks = super.s_inodes_per_group / inodes_per_block;
@@ -574,4 +639,25 @@ void test_fs() {
     // test!
     print_file("test.txt");
 }
+
+int mkdir(char *path) {
+    // identify parent directory + name
+    char *token = strtok(path, "/");
+    // first character should be "/"
+    if (strlen(token) != 0) return 1;
+
+    char *following = strtok(NULL, "/");
+
+    inode_t root = get_root_dir_inode();
+
+    while (token != NULL) {
+        // parse the next step in the path, and 
+        // get the next directory.
+        // if following is null, then "token" 
+        // is the directory we should try to make. 
+
+        // we got the directory by name.
+    }
+}
+
 

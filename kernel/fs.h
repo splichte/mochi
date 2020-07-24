@@ -176,14 +176,26 @@ typedef struct {
     uint8_t i_osd2[12];
 } inode_t;
 
+
+
 // 32, 32, 64 = 128
-typedef struct _dentry {
+typedef struct {
     uint32_t inode;
-    uint16_t rec_len;
+    uint16_t rec_len; // points to end of block if no next
     uint8_t name_len;
     uint8_t file_type;
     char name[64]; // wasteful, but whatever!
 } dentry_t;
+
+// for use in the OS. has helpful backpointers 
+// when doing disk operations. 
+typedef struct {
+    inode_t inode;
+
+    // index of this file's inode in the inode table.
+    // helpful for updating the inode.
+    uint32_t inode_n;
+} mochi_file;
 
 
 // make an ext2 filesystem on the disk.

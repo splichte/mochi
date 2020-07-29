@@ -7,6 +7,7 @@
 #include "../drivers/disk.h"
 #include "kalloc.h"
 #include "string.h"
+#include "../drivers/screen.h"
 
 #define S_BLOCK_SIZE    (1024 << super.s_log_block_size)
 
@@ -26,7 +27,6 @@ static bgdesc_t bgdt[1024];
 
 static superblock_t super;
 
-static fs_blk_sz;
 
 int disk_read_blk(uint32_t block_num, uint8_t *buf) {
     if (!fs_start_set) return 1;
@@ -375,7 +375,7 @@ inode_t get_inode(uint32_t inode_n) {
 // hides all the "indirect block" stuff
 // at the cost of a bit of efficiency.
 //
-uint32_t get_data_block_n(mochi_file file, uint32_t i) {
+uint32_t get_data_block_n(inode_t file, uint32_t i) {
     uint32_t dir_blk_len = 12;
     if (i < dir_blk_len) {
         return file.i_block[i];
@@ -414,12 +414,16 @@ uint32_t get_data_block_n(mochi_file file, uint32_t i) {
 
 /* Get the ith block for a file. */
 uint8_t *get_file_block(mochi_file file, uint32_t i) {
-    uint32_t block_n = get_data_block_n(file, i);
+    uint32_t block_n = get_data_block_n(file.inode, i);
+    print("getting block: ");
+    print_word(block_n);
 
     uint8_t *buf = (uint8_t *) kcalloc(S_BLOCK_SIZE, sizeof(uint8_t));
 
     if (disk_read_blk(block_n, buf)) return NULL;
 
+    print("returning pointer: ");
+    print_word(buf);
     return buf;
 }
 
@@ -467,7 +471,8 @@ int set_i_block(inode_t file, uint32_t inode_n, uint32_t i, uint32_t blockn) {
     uint32_t dir_blk_len = 12;
     if (i < dir_blk_len) {
         file.i_block[i] = blockn;
-        return write_inode_table(inode_n, file);
+        write_inode_table(inode_n, file);
+        return 0;
     }
 
     /* Indirect blocks. */
@@ -512,6 +517,11 @@ int set_i_block(inode_t file, uint32_t inode_n, uint32_t i, uint32_t blockn) {
     return 0;
 }
 
+uint16_t i_block_len(inode_t i) {
+    return i.i_blocks / (2 << super.s_log_block_size);
+}
+
+
 int chdir(mochi_file current_dir, const char *name, mochi_file *ret_dir) {
     uint16_t nblocks = i_block_len(current_dir.inode);
 
@@ -522,7 +532,10 @@ int chdir(mochi_file current_dir, const char *name, mochi_file *ret_dir) {
 
     for (int i = 0; i < nblocks; i++) {
         dentry_t *dentries = (dentry_t *) get_file_block(current_dir, i);
-        if (dentries == NULL) return -1;
+        if (dentries == NULL) {
+            print("null\n");
+            return -1;
+        }
 
         for (int i = 0; i < dentries_per_blk; i++) {
             dentry_t d = dentries[i];
@@ -537,27 +550,24 @@ int chdir(mochi_file current_dir, const char *name, mochi_file *ret_dir) {
                 return 0;
             }
         }
-        kfree(block);
+        kfree(dentries);
     }
 
+    print("no find");
     // we didn't find name. 
     return -1; 
 }
 
-uint16_t i_block_len(inode_t i) {
-    return i.i_blocks / (2 << super.s_log_block_size);
-}
-
-int add_block_to_file(mochi_file file, uint32_t block) {
+int add_block_to_file(mochi_file file, uint32_t new_block) {
     // need to: update inode with new i_blocks
     // and i_block (and make sure inode table is updated...)
     file.inode.i_blocks += 2;
 
     // update i_block array
-    uint16_t block_len = i_block_len(file.i_node);
+    uint16_t block_len = i_block_len(file.inode);
     set_i_block(file.inode, file.inode_n, block_len - 1, new_block);
 
-    write_inode_table(dir.inode_n, inode);
+    write_inode_table(file.inode_n, file.inode);
 
     return 0;
 }
@@ -587,22 +597,47 @@ int add_dentry(mochi_file dir, dentry_t d) {
 
     uint16_t block_len = i_block_len(inode);
 
+    print("block len: ");
+    print_word(block_len);
+
     // see if this block is full
     uint8_t *block = get_file_block(dir, block_len - 1);
     if (block == NULL) return -1;
 
-    // if block is full, write to the next data block. 
-    dentry_t curr;
+    // if block is full, write to the next data block.
+    dentry_t *curr = (dentry_t *) block;
     uint8_t dentries_read;
-    for (uint16_t pos = 0; pos < S_BLOCK_SIZE; pos += curr->rec_len) {
-        curr = *((dentry_t *) (block + pos));
+    uint16_t pos = 0;
+
+    uint16_t lastpos;
+    while (pos < S_BLOCK_SIZE) {
+        lastpos = pos;
+        pos += curr->rec_len;
+
+        if (pos != lastpos) {
+           print("pos update");
+           print_word(pos);
+        }
+        curr = (dentry_t *) (block + pos);
         dentries_read++;
     }
+
+    print("here\n");
+
+    // TODO: update curr->rec_len to point to the "last" entry in the block.
 
     if (dentries_read < S_BLOCK_SIZE / sizeof(dentry_t)) {
         // we can fit another dentry in this block.
 
-        curr->rec_len = sizeof(dentry_t);
+        curr->rec_len = S_BLOCK_SIZE - dentries_read * sizeof(dentry_t);
+
+        // go back and modify the previous dentry, if it exists.
+        // it will still be pointing to the end of the block, 
+        // and we don't want that. 
+        if (dentries_read > 0) {
+            (curr - 1)->rec_len = sizeof(dentry_t); 
+        }
+
         // create new dentry here.
         // where in "block" are we?
         uint16_t pos = ((uint8_t *) curr) - block;
@@ -611,7 +646,7 @@ int add_dentry(mochi_file dir, dentry_t d) {
         *new_dentry = d;
 
         // write this disk block back.
-        disk_write_blk(blockn, block);
+        disk_write_blk(block_len - 1, block);
         return 0;
     } else {
         // we can't fit another dentry in this block.
@@ -620,6 +655,9 @@ int add_dentry(mochi_file dir, dentry_t d) {
         reserve_free_block(&new_block);
 
         add_block_to_file(dir, new_block);
+
+        // set rec_len to the end of the block
+        d.rec_len = S_BLOCK_SIZE;
 
         return write_block_at(new_block, 0, (uint8_t *) &d, sizeof(dentry_t));
     }
@@ -674,7 +712,8 @@ int create_test_file() {
     // add a "directory entry" in the root directory. 
     dentry_t d = {
         .inode = free_inode_n,
-        .rec_len = sizeof(dentry_t),
+        .rec_len = S_BLOCK_SIZE, // rec_len needs to point to end of block
+        // since it's the last entry. 
         .name_len = flen,
         .file_type = EXT2_FT_DIR };
 
@@ -739,7 +778,7 @@ void print_file(const char *fn) {
         for (int i = 0; i < ind.i_size; i++) {
             fdata[i] = bufb[i];
         }
-        print((const char *) fdata);
+        print((char *) fdata);
     }
 }
 
@@ -749,6 +788,9 @@ int create_root_directory() {
         print("No free blocks available.\n");
         return -1;
     }
+
+    // where do we set the dentry?
+    // oh. there is none...
 
     // the root directory is always at the same location
     // in the inode table.
@@ -817,7 +859,6 @@ void set_initial_used_blocks() {
 }
 
 
-
 void finish_fs_init(uint32_t mb_start) {
     // read the metadata into our "local" variables.
     read_fs(mb_start);
@@ -833,78 +874,90 @@ void test_fs() {
 
     // test!
     print_file("test.txt");
+
+    mkdir("/usr");
+
+    print("helloo\n");
 }
 
-int mkdir(char *path) {
-    // identify parent directory + name
+int split_path(char *path, mochi_file *parent, char *leaf) {
     char *next_dirname = strtok(path, "/");
+
     // first character should be "/"
-    if (strlen(curr_name) != 0) return 1;
+    if (strlen(next_dirname) != 0) return -1;
 
     next_dirname = strtok(NULL, "/");
+    char *following_dirname = strtok(NULL, "/");
 
     mochi_file curr_dir = get_root_dir();
 
     mochi_file next_dir;
-    while (next_dirname != NULL) {
+    while (following_dirname != NULL) {
         if (chdir(curr_dir, next_dirname, &next_dir)) return -1;
         curr_dir = next_dir;
-        next_dirname = strtok(NULL, "/");
-    }
-    // next dirname is null. this is the directory to create!
-    // use code from "create root directory"
-    uint32_t free_block_n, free_inode_n;
-    if (first_free_block_num(&free_block_n)) {
-        print("No free blocks available.\n");
-        return -1;
+        next_dirname = following_dirname;
+        following_dirname = strtok(NULL, "/");
     }
 
-    if (first_free_inode_num(&free_inode_n)) {
-        print("No free inodes available.\n");
-        return -1;
-    }
+    strcpy(leaf, next_dirname);
+    *parent = curr_dir;
 
-    // add a dentry for this new directory to curr_inode
+    return 0;
+}
+
+int ls(char *path) {
+    mochi_file parent_dir;
+    char leaf[64];
+    split_path(path, &parent_dir, leaf);
+    mochi_file leaf_dir;
+    chdir(parent_dir, leaf, &leaf_dir);
+
+    // list all files in leaf_directory
+    uint32_t block_len = i_block_len(leaf_dir.inode);
+    for (uint32_t i = 0; i < block_len; i++) {
+        // read the block
+        uint8_t *block = get_file_block(leaf_dir, i);
+
+        kfree(block); 
+    }
+}
+
+int mkdir(char *path) {
+    mochi_file parent_dir;
+    char new_dirname[64];
+    split_path(path, &parent_dir, new_dirname);
+
+    // looks good here!!
+    print("split path: ");
+    print(new_dirname);
+    print("\n");
+
+    uint32_t new_inode_n, new_block_n;
+    reserve_free_inode(&new_inode_n);
+    reserve_free_block(&new_block_n);
+
+    // Create a new inode, and update the inode table with it.
+    inode_t new_inode = new_dir_inode(new_block_n);
+
+    // write to inode table
+    write_inode_table(new_inode_n, new_inode);
+
+    // add a dentry for this new directory
     dentry_t d = {
-        .inode = free_inode_n,
+        .inode = new_inode_n,
         .rec_len = sizeof(dentry_t),
-        .name_len = strlen(next_dirname),
+        .name_len = strlen(new_dirname),
         .file_type = EXT2_FT_DIR,
     };
 
     // copy the name
-    strcpy(d.name, next_dirname);
+    strcpy(d.name, new_dirname);
 
-    // add directory entry to current directory
-    add_dentry(curr_dir, d);
+    print("ready to add dentry\n");
 
-    // Create a new inode, and update the inode table with it.
-    inode_t new_inode = new_dir_inode(free_block_n);
+    // add directory entry to parent directory
+    add_dentry(parent_dir, d);
 
-    // write to inode table
-    write_inode_table(free_inode_n, new_inode);
-
-    // set inode bitmap
-    set_inode_bitmap(free_inode_n);
-
-    // set block bitmap
-    set_block_bitmap(free_block_n);
-
-    // TODO: an optimization is to not actually sync
-    // the superblock/bgdt to disk so often. that saves time.
-
-    // update the block group descriptor that the inode belongs to.
-    update_inode_bg_desc(free_inode_n);
-    update_block_bg_desc(free_block_n);
-    disk_sync_bgdt();
-
-    // update the block group descriptor that the block belongs to.
-    // update the superblock. 
-    super.s_free_blocks_count -= 1;
-    super.s_free_inodes_count -= 1;
-    disk_sync_super();
-
-    // we have to write the dentry of the current inode...
+    print("added dentry\n");
 }
-
 

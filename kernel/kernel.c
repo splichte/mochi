@@ -101,6 +101,8 @@ int kmain() {
 
     test_fs();
 
+
+
     // turned these off for now...since we have virtual memory 
     // turned on.
 //    transmit_initialization();

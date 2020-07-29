@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 
 void *kmalloc(uint32_t req_size);

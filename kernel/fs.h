@@ -177,14 +177,13 @@ typedef struct {
 } inode_t;
 
 
-
 // 32, 32, 64 = 128
 typedef struct {
     uint32_t inode;
     uint16_t rec_len; // points to end of block if no next
     uint8_t name_len;
     uint8_t file_type;
-    char name[64]; // wasteful, but whatever!
+    char name[64]; // wasteful
 } dentry_t;
 
 // for use in the OS. has helpful backpointers 
@@ -224,13 +223,15 @@ typedef struct {
 } file_t;
 
 // given a "path", print the file contents
-void cat(const char *path);
+void cat(char *path);
 
 // how to "make" a new file"?
 // I want to open a file for writing.
 
 // rename a file
-//int mkdir(const char *pathname);
+int mkdir(char *pathname);
 //int rmdir(const char *pathname);
+
+int ls(char *path);
 
 

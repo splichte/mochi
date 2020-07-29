@@ -1,9 +1,3 @@
-# cp the previous os image into ext2_disk, so we 
-# don't lose changes that were made while inside the OS.
-
-# tail -b 16384 > ext2_disk
-
-
 # booting code gets up to 16K.
 cat boot/boot_sect.bin boot/switch_to_pm.bin > os_image
 

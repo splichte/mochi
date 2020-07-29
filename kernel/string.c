@@ -65,6 +65,15 @@ int strcmp(const char *s1, const char *s2) {
     return *is1 < *is2;
 }
 
+char *strcpy(char *s, const char *ct) {
+    char *sn = s;
+    while (*ct != '\0') {
+        *sn++ = *ct++;
+    }
+    *sn = '\0';
+    return s;
+}
+
 size_t strlen(const char *s) {
     size_t i = 0;
     for (; s[i] != '\0'; i++);
@@ -72,29 +81,34 @@ size_t strlen(const char *s) {
 }
 
 int char_in_set(char c, const char *set) {
-    while (*set++ != '\0') {
-        if (c == *set) return 1;
+    while (*set != '\0') {
+        if (c == *set++) return 1;
     }
     return 0;
 }
 
 char *strtok(char *str, const char *delim) {
     static char *buf;
+    static int chars_left;
 
     if (str != NULL) {
+        chars_left = strlen(str);
         buf = str;
     }
+
+    if (chars_left == 0) return NULL;
 
     char *tok_start = buf;
 
     while (!char_in_set(*buf, delim)) {
+        // hit end of string. return.
         if (*buf == '\0') {
-            return NULL;
+            return tok_start;
         }
-        buf++;
+        buf++; chars_left--;
     }
     // found a match. 
-    *buf++ = '\0';
+    *buf++ = '\0'; chars_left--;
     return tok_start;
 }
 

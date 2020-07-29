@@ -20,18 +20,3 @@ void page_fault_handler(struct interrupt_frame *frame, uint32_t error_code) {
 
 }
 
-typedef struct {
-    uint32_t ptr_addr;
-    uint32_t sz;
-    uint8_t is_active; // could use a bitfield, but premature
-} allocation_record;
-
-/* we have a chunk of memory available...starting at. */
-void *kmalloc(uint32_t size) {
-    // find a free chunk of memory. we have a big block of heap memory.
-    
-}
-
-void kfree(void *p) {
-
-}

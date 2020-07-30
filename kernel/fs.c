@@ -271,13 +271,14 @@ void update_block_bg_desc(uint32_t free_block_n) {
     block_bg_desc.bg_free_blocks_count -= 1;
 }
 
-inode_t new_dir_inode(uint32_t free_block_n) {
+// we shouldn't automatically attach a free block to the directory. 
+inode_t new_dir_inode() {
     inode_t new_inode;
     new_inode.i_mode = EXT2_S_IFDIR;
     new_inode.i_links_count = 1; // 1 or 0?
-    new_inode.i_blocks = 2; 
+    new_inode.i_blocks = 0; 
     new_inode.i_links_count = 1;
-    new_inode.i_block[0] = free_block_n;
+//    new_inode.i_block[0] = free_block_n;
     new_inode.i_file_acl = 0;
     new_inode.i_dir_acl = 0;
     new_inode.i_faddr = 0;
@@ -415,15 +416,11 @@ uint32_t get_data_block_n(inode_t file, uint32_t i) {
 /* Get the ith block for a file. */
 uint8_t *get_file_block(mochi_file file, uint32_t i) {
     uint32_t block_n = get_data_block_n(file.inode, i);
-    print("getting block: ");
-    print_word(block_n);
 
     uint8_t *buf = (uint8_t *) kcalloc(S_BLOCK_SIZE, sizeof(uint8_t));
 
     if (disk_read_blk(block_n, buf)) return NULL;
 
-    print("returning pointer: ");
-    print_word(buf);
     return buf;
 }
 
@@ -450,28 +447,31 @@ int reserve_free_block(uint32_t *block_n) {
     return 0;
 }
 
-int reserve_free_inode(uint32_t *inode_n) {
-    if (first_free_inode_num(inode_n)) {
-        print("No free inodes available.\n");
-        return -1;
-    }
+int reserve_inode(uint32_t inode_n) {
+    set_inode_bitmap(inode_n);
 
-    set_inode_bitmap(*inode_n);
-
-    update_inode_bg_desc(*inode_n);
+    update_inode_bg_desc(inode_n);
     disk_sync_bgdt();
 
     super.s_free_inodes_count -= 1;
     disk_sync_super();
 }
 
-int set_i_block(inode_t file, uint32_t inode_n, uint32_t i, uint32_t blockn) {
+int reserve_free_inode(uint32_t *inode_n) {
+    if (first_free_inode_num(inode_n)) {
+        print("No free inodes available.\n");
+        return -1;
+    }
+    reserve_inode(*inode_n);
+}
+
+int set_i_block(inode_t *file, uint32_t inode_n, uint32_t i, uint32_t blockn) {
     /* Direct blocks */
 
     uint32_t dir_blk_len = 12;
     if (i < dir_blk_len) {
-        file.i_block[i] = blockn;
-        write_inode_table(inode_n, file);
+        file->i_block[i] = blockn;
+        write_inode_table(inode_n, *file);
         return 0;
     }
 
@@ -481,10 +481,10 @@ int set_i_block(inode_t file, uint32_t inode_n, uint32_t i, uint32_t blockn) {
 
     if (i < dir_blk_len + ind_blk_len) {
         uint32_t blocks[ind_blk_len];
-        disk_read_blk(file.i_block[12], (uint8_t *) blocks);
+        disk_read_blk(file->i_block[12], (uint8_t *) blocks);
         uint16_t j = i - dir_blk_len;
         blocks[j] = blockn;
-        disk_write_blk(file.i_block[12], (uint8_t *) blocks);
+        disk_write_blk(file->i_block[12], (uint8_t *) blocks);
 
         return 0;
     }
@@ -494,7 +494,7 @@ int set_i_block(inode_t file, uint32_t inode_n, uint32_t i, uint32_t blockn) {
     uint32_t dbl_ind_blk_len = S_BLOCK_SIZE * ind_blk_len;
     if (i < dir_blk_len + ind_blk_len + dbl_ind_blk_len) {
         uint32_t blocks[ind_blk_len];
-        disk_read_blk(file.i_block[13], (uint8_t *) blocks);
+        disk_read_blk(file->i_block[13], (uint8_t *) blocks);
 
         uint32_t j = i - dir_blk_len - ind_blk_len;
 
@@ -537,6 +537,8 @@ int chdir(mochi_file current_dir, const char *name, mochi_file *ret_dir) {
             return -1;
         }
 
+        // this is weird, since there aren't all these entries in block.
+        // seems like the "usr" dentry wasn't added!
         for (int i = 0; i < dentries_per_blk; i++) {
             dentry_t d = dentries[i];
             if (!strcmp(d.name, name)) {
@@ -553,23 +555,22 @@ int chdir(mochi_file current_dir, const char *name, mochi_file *ret_dir) {
         kfree(dentries);
     }
 
-    print("no find");
     // we didn't find name. 
     return -1; 
 }
 
-int add_block_to_file(mochi_file file, uint32_t new_block) {
+int add_block_to_file(mochi_file *file, uint32_t new_block) {
     // need to: update inode with new i_blocks
     // and i_block (and make sure inode table is updated...)
-    file.inode.i_blocks += 2;
+    file->inode.i_blocks += 2;
 
     // update i_block array
-    uint16_t block_len = i_block_len(file.inode);
-    set_i_block(file.inode, file.inode_n, block_len - 1, new_block);
+    uint16_t block_len = i_block_len(file->inode);
 
-    write_inode_table(file.inode_n, file.inode);
+    // writes inode table
+    set_i_block(&(file->inode), file->inode_n, block_len - 1, new_block);
 
-    return 0;
+    return 0; 
 }
 
 int write_block_at(uint32_t block, uint16_t offset, uint8_t *chunk, uint16_t len) {
@@ -581,8 +582,8 @@ int write_block_at(uint32_t block, uint16_t offset, uint8_t *chunk, uint16_t len
     disk_read_blk(block, buf);
 
     // update the buffer at location we want
-    for (uint16_t i = offset; i < offset + len; i++) {
-        buf[i] = chunk[i];
+    for (uint16_t i = 0; i < len; i++) {
+        buf[i + offset] = chunk[i];
     }
 
     // write it back
@@ -591,76 +592,79 @@ int write_block_at(uint32_t block, uint16_t offset, uint8_t *chunk, uint16_t len
     return 0;
 }
 
+int add_dentry_to_new_block(mochi_file dir, dentry_t d) {
+    uint32_t new_block;
+    reserve_free_block(&new_block);
+
+    add_block_to_file(&dir, new_block);
+
+    // set rec_len to the end of the block
+    d.rec_len = S_BLOCK_SIZE;
+
+    return write_block_at(new_block, 0, (uint8_t *) &d, sizeof(dentry_t));
+}
+
 int add_dentry(mochi_file dir, dentry_t d) {
     // find the insert point
     inode_t inode = dir.inode;
 
+    // this inode is not getting the "updated" 
+    // root directory, for some reason...
+    // when we do "get_inode" it's correct!
     uint16_t block_len = i_block_len(inode);
 
-    print("block len: ");
-    print_word(block_len);
+    // no block assigned to directory yet?
+    if (block_len == 0) {
+        return add_dentry_to_new_block(dir, d);
+    }
 
-    // see if this block is full
-    uint8_t *block = get_file_block(dir, block_len - 1);
-    if (block == NULL) return -1;
+    // at least one block in use. see if the last block is full. 
+    // TODO: if entries are deleted, directory might have 
+    // "holes" in it. 
+    uint8_t *block = get_file_block(dir, block_len - 1); 
+    if (block == NULL) return -1; 
 
-    // if block is full, write to the next data block.
-    dentry_t *curr = (dentry_t *) block;
-    uint8_t dentries_read;
+    dentry_t *curr;
+    uint8_t dentries_read = 0;
     uint16_t pos = 0;
-
     uint16_t lastpos;
+
     while (pos < S_BLOCK_SIZE) {
+        curr = (dentry_t *) (block + pos);
         lastpos = pos;
         pos += curr->rec_len;
 
-        if (pos != lastpos) {
-           print("pos update");
-           print_word(pos);
-        }
-        curr = (dentry_t *) (block + pos);
         dentries_read++;
     }
 
-    print("here\n");
-
-    // TODO: update curr->rec_len to point to the "last" entry in the block.
-
-    if (dentries_read < S_BLOCK_SIZE / sizeof(dentry_t)) {
-        // we can fit another dentry in this block.
-
-        curr->rec_len = S_BLOCK_SIZE - dentries_read * sizeof(dentry_t);
-
-        // go back and modify the previous dentry, if it exists.
-        // it will still be pointing to the end of the block, 
-        // and we don't want that. 
-        if (dentries_read > 0) {
-            (curr - 1)->rec_len = sizeof(dentry_t); 
-        }
-
-        // create new dentry here.
-        // where in "block" are we?
-        uint16_t pos = ((uint8_t *) curr) - block;
-        uint16_t new_dentry_pos = pos + sizeof(dentry_t);
-        dentry_t *new_dentry = (dentry_t *)(block + new_dentry_pos);
-        *new_dentry = d;
-
-        // write this disk block back.
-        disk_write_blk(block_len - 1, block);
-        return 0;
-    } else {
+    if (dentries_read >= S_BLOCK_SIZE / sizeof(dentry_t)) {
         // we can't fit another dentry in this block.
-        // we need a new block.
-        uint32_t new_block;
-        reserve_free_block(&new_block);
-
-        add_block_to_file(dir, new_block);
-
-        // set rec_len to the end of the block
-        d.rec_len = S_BLOCK_SIZE;
-
-        return write_block_at(new_block, 0, (uint8_t *) &d, sizeof(dentry_t));
+        return add_dentry_to_new_block(dir, d);
     }
+
+    // we can fit another dentry in this block.
+
+    // modify the last dentry, if it exists.
+    // it will still be pointing to the end of the block, 
+    // and we don't want that. 
+    if (dentries_read > 0) {
+        curr->rec_len = sizeof(dentry_t); 
+    }
+
+    dentry_t *new_dentry = curr + 1;
+    *new_dentry = d;
+
+    // update rec_len to appropriately point to the end of the block
+    // from the start of this dentry.
+    new_dentry->rec_len = S_BLOCK_SIZE - dentries_read * sizeof(dentry_t);
+
+    // write this disk block back.
+
+    uint32_t fblock_n = get_data_block_n(dir.inode, block_len - 1);
+   
+    disk_write_blk(fblock_n, block);
+
+    return 0;
 }
 
 // TODO: just cache this, like we do with superblock.
@@ -672,6 +676,7 @@ mochi_file get_root_dir() {
     return f;
 }
 
+// deprecate! use a generic mkfile thing. 
 // "/test.txt"
 int create_test_file() {
     char *fn = "test.txt";
@@ -717,9 +722,7 @@ int create_test_file() {
         .name_len = flen,
         .file_type = EXT2_FT_DIR };
 
-    for (int i = 0; i < flen; i++) {
-        d.name[i] = fn[i];
-    }
+    strcpy(d.name, fn);
 
     // put the dentry d in the directory file!
     mochi_file root = get_root_dir();
@@ -783,44 +786,17 @@ void print_file(const char *fn) {
 }
 
 int create_root_directory() {
-    uint32_t free_block_n, free_inode_n;
-    if (first_free_block_num(&free_block_n)) {
-        print("No free blocks available.\n");
-        return -1;
-    }
-
-    // where do we set the dentry?
-    // oh. there is none...
-
     // the root directory is always at the same location
     // in the inode table.
-    free_inode_n = EXT2_ROOT_INO;
+    uint32_t root_inode_n = EXT2_ROOT_INO;
 
     // Create a new inode, and update the inode table with it.
-    inode_t new_inode = new_dir_inode(free_block_n);
+    inode_t new_inode = new_dir_inode();
+
+    reserve_inode(root_inode_n);
 
     // write to inode table
-    write_inode_table(free_inode_n, new_inode);
-
-    // set inode bitmap
-    set_inode_bitmap(free_inode_n);
-
-    // set block bitmap
-    set_block_bitmap(free_block_n);
-
-    // TODO: an optimization is to not actually sync
-    // the superblock/bgdt to disk so often. that saves time.
-
-    // update the block group descriptor that the inode belongs to.
-    update_inode_bg_desc(free_inode_n);
-    update_block_bg_desc(free_block_n);
-    disk_sync_bgdt();
-
-    // update the block group descriptor that the block belongs to.
-    // update the superblock. 
-    super.s_free_blocks_count -= 1;
-    super.s_free_inodes_count -= 1;
-    disk_sync_super();
+    write_inode_table(root_inode_n, new_inode);
 }
 
 
@@ -870,14 +846,21 @@ void finish_fs_init(uint32_t mb_start) {
 }
 
 void test_fs() {
-    create_test_file();
+    // deprecate. make a "mkfile" function, 
+    // that doesn't assume directory, etc.
+//    create_test_file();
 
     // test!
-    print_file("test.txt");
+//    print_file("test.txt");
 
+    // this SHOULD add a new block. but it isn't doing so.
     mkdir("/usr");
 
-    print("helloo\n");
+    // make a nested directory.
+    mkdir("/usr/hi");
+
+
+    print("test_fs finished.\n");
 }
 
 int split_path(char *path, mochi_file *parent, char *leaf) {
@@ -893,7 +876,11 @@ int split_path(char *path, mochi_file *parent, char *leaf) {
 
     mochi_file next_dir;
     while (following_dirname != NULL) {
-        if (chdir(curr_dir, next_dirname, &next_dir)) return -1;
+        // failed to change directory
+        if (chdir(curr_dir, next_dirname, &next_dir)) {
+            print("failed to change directory\n");
+            return -1;
+        }
         curr_dir = next_dir;
         next_dirname = following_dirname;
         following_dirname = strtok(NULL, "/");
@@ -925,10 +912,10 @@ int ls(char *path) {
 int mkdir(char *path) {
     mochi_file parent_dir;
     char new_dirname[64];
-    split_path(path, &parent_dir, new_dirname);
+    if (split_path(path, &parent_dir, new_dirname)) return -1;
 
     // looks good here!!
-    print("split path: ");
+    print("mkdir: ");
     print(new_dirname);
     print("\n");
 
@@ -953,11 +940,7 @@ int mkdir(char *path) {
     // copy the name
     strcpy(d.name, new_dirname);
 
-    print("ready to add dentry\n");
-
     // add directory entry to parent directory
     add_dentry(parent_dir, d);
-
-    print("added dentry\n");
 }
 

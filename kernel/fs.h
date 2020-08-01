@@ -228,9 +228,8 @@ void cat(char *path);
 // how to "make" a new file"?
 // I want to open a file for writing.
 
-// rename a file
 int mkdir(char *pathname);
-//int rmdir(const char *pathname);
+int rmdir(char *pathname);
 
 int ls(char *path);
 

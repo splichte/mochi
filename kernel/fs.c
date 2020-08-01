@@ -857,19 +857,26 @@ void test_fs() {
     mkdir("/usr");
 
     // make a nested directory.
-    mkdir("/usr/hi");
 
+    // avoid storing in same location
+    // (because internally mkdir uses strtok)
+    // TODO: this is super ugly. let's try to migrate from strtok
+    char p1[] = "/usr/hi";
+    mkdir(p1);
+
+    char p2[] = "/usr/hi";
+    rmdir(p2);
 
     print("test_fs finished.\n");
 }
 
 int split_path(char *path, mochi_file *parent, char *leaf) {
     char *next_dirname = strtok(path, "/");
-
     // first character should be "/"
     if (strlen(next_dirname) != 0) return -1;
 
     next_dirname = strtok(NULL, "/");
+
     char *following_dirname = strtok(NULL, "/");
 
     mochi_file curr_dir = get_root_dir();
@@ -942,5 +949,17 @@ int mkdir(char *path) {
 
     // add directory entry to parent directory
     add_dentry(parent_dir, d);
+}
+
+int rmdir(char *path) {
+    mochi_file parent_dir;
+    char target_dirname[64];
+    print("\nin rmdir\n");
+    print("received path: "); print(path); print("\n");
+    if (split_path(path, &parent_dir, target_dirname)) return -1;
+
+    print("rmdir: ");
+    print(target_dirname);
+    print("\n");
 }
 

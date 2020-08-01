@@ -30,4 +30,7 @@ char *strcpy(char *s, const char *ct);
 
 size_t strlen(const char *s);
 
+/* NOTE: you can't use string constants for this function. 
+ * (matches standard lib)
+ */
 char *strtok(char *str, const char *delim);

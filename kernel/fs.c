@@ -853,24 +853,21 @@ void test_fs() {
     // test!
 //    print_file("test.txt");
 
-    // this SHOULD add a new block. but it isn't doing so.
     mkdir("/usr");
 
     // make a nested directory.
+    mkdir("/usr/hi");
 
-    // avoid storing in same location
-    // (because internally mkdir uses strtok)
-    // TODO: this is super ugly. let's try to migrate from strtok
-    char p1[] = "/usr/hi";
-    mkdir(p1);
-
-    char p2[] = "/usr/hi";
-    rmdir(p2);
+    rmdir("/usr/hi");
 
     print("test_fs finished.\n");
 }
 
-int split_path(char *path, mochi_file *parent, char *leaf) {
+int split_path(const char *usr_path, mochi_file *parent, char *leaf) {
+    // copy the path right away, so strtok doesn't corrupt it.
+    char path[strlen(usr_path)];
+    strcpy(path, usr_path);
+
     char *next_dirname = strtok(path, "/");
     // first character should be "/"
     if (strlen(next_dirname) != 0) return -1;

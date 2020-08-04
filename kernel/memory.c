@@ -230,7 +230,7 @@ void zero_page_directory() {
 
     for (int i = 0; i < N_PAGE_TABLES; i++) {
         // we've set these entries:
-        // 0, 1, 4, 6, 768, 769, 772, 960
+        // 0, 1, 4, 6, 768, 769, 772, 960, 1018
         // (see boot/bootloader.c)
         // don't change those, but zero everything else.
         switch(i) {
@@ -243,6 +243,7 @@ void zero_page_directory() {
             case 769:
             case 772:
             case 960:
+            case 1018:
                 break;
             default:
                 pd[i] = 0;

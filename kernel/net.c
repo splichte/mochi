@@ -280,9 +280,9 @@ pci_device get_e1000() {
     e1000.bdf = get_ethernet_bdf();
     if (e1000.bdf.bus == -1) {
         // TODO: better error
+        print("not found\n");
         return e1000;
     }
-
     // enable bus mastering
     uint16_t cmd_reg = pci_get_command(e1000.bdf);
     cmd_reg |= (1 << 2); // from toaru
@@ -293,6 +293,7 @@ pci_device get_e1000() {
 
     e1000.interrupt = pci_get_interrupt_line(e1000.bdf);
 
+
     // enable bus mastering? do we need to do that?
 
     // determine if it's mem space or io space
@@ -300,6 +301,9 @@ pci_device get_e1000() {
     //
     // evaluates to 0xfebc0000 on qemu
     e1000.bar0 = pci_get_bar0(e1000.bdf) & 0xfffffff0;
+    print("pci device bar0: \n");
+    print_word(e1000.bar0);
+
 
     return e1000;
 }
@@ -327,7 +331,10 @@ void transmit_initialization() {
     // (done above)
     //
     // 2. point TDBAL to that region. 
-    pci_reg_write(E1000_TDBAL, (uint32_t) ring_buf);
+    print("ring buffer location: \n");
+    uint32_t rb_loc = ((uint32_t) ring_buf) - 0xc0000000;
+    print_word(rb_loc);
+    pci_reg_write(E1000_TDBAL, rb_loc);
 
     // 3. set TDLEN to size of descriptor ring (in bytes)
     pci_reg_write(E1000_TDLEN, E1000_NUM_TX_DESC * sizeof(tx_desc));
@@ -342,7 +349,6 @@ void transmit_initialization() {
 
     // 6. set Transmit IPG
     pci_reg_write(E1000_TIPG, TIPGT);
-
 }
 
 void test_transmit() {

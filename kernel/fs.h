@@ -233,4 +233,36 @@ int rmdir(char *pathname);
 
 int ls(char *path);
 
+/* open file structure.*/
+typedef struct {
+    // inode for this file
+    inode_t *inode;
+
+    // where we are in this file
+    uint32_t cursor_blockn;
+    uint16_t cursor_offset;
+    
+    // read/write? kerrisk describes this...
+    uint8_t flags; 
+} FILE;
+
+// the "file table" (more of a linked list than a table.)
+typedef struct _ft {
+    // inode? something to implement the standard streams.
+    //
+    int fd; // the number associated with this file descriptor.
+    struct _ft *next;
+    struct _ft *prev;
+} ft_entry;
+
+
+/* the following are from the Linux manpages.*/
+int open(const char *pathname, int flags);
+
+/* "read() attempts to read up to *count* bytes 
+ * from file descriptor *fd* into the buffer starting 
+ * at *buf*.
+ */
+//ssize_t read(int fd, void *buf, size_t count);
+
 

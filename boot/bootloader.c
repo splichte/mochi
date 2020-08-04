@@ -52,6 +52,8 @@ void set_initial_page_tables() {
     // in bytes)
     uint32_t pt_base_addr = page_directory_addr + 0x1000;
 
+
+
     // ==== Low Pages (Screen)
     //
     // physical address range: 0x0000.0000 to 0x0040.0000
@@ -69,6 +71,26 @@ void set_initial_page_tables() {
 
     set_pd_entry(pd_plow_i, pt_low_addr);
     set_pd_entry(pd_vlow_i, pt_low_addr);
+
+
+
+
+    // ==== PCI Pages 
+    //
+    // the PCI address we need for e1000 MMIO is at 0xfebc.0000
+    //
+    // physical address range: 0xfe80.0000 to 0xfec0.0000
+    // virtual address range: 0xfe80.0000 to 0xfec0.0000
+    //
+    // identity-mapped.
+    //
+    uint16_t pd_pci_i = 1018; // 0xc000.0000
+
+    uint32_t pt_pci_addr = pt_base_addr + pd_pci_i * 0x1000;
+    init_pt(pt_pci_addr, 0xfe800000);
+
+    set_pd_entry(pd_pci_i, pt_pci_addr);
+
 
 
     // ==== Kernel Pages
@@ -109,6 +131,7 @@ void set_initial_page_tables() {
     pt_page_addr += 0x1000;
     init_pt(pt_page_addr, 0x800000);
     set_pd_entry(pd_vpt_i, pt_page_addr);
+
 
 
 

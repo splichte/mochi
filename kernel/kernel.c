@@ -97,16 +97,20 @@ int kmain() {
     print("Welcome to Mochi ^_^ \n");
     print(">");
 
-    mkfs(8, 24);
+//    mkfs(8, 24);
 
-    test_fs();
+//    test_fs();
 
 
 
     // turned these off for now...since we have virtual memory 
     // turned on.
-//    transmit_initialization();
-//    test_transmit();
+
+    // 
+    transmit_initialization();
+    print("transmit init done\n");
+    test_transmit();
+    print("test transmit done\n");
 
     // test processes.
 //    init_root_process();

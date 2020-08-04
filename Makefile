@@ -18,10 +18,11 @@ run: all
 	# todo: https://gist.github.com/extremecoders-re/e8fd8a67a515fee0c873dcafc81d811c
 	# useful: memory_region*
 	#	-d in_asm,op,trace:memory_region*,trace:guest_mem* 
-#	~/code/qemu/build/i386-softmmu/qemu-system-i386 -s 
-#	# useful:
+	#	# useful:
 #	# -d in_asm,mmu,cpu_reset
-	qemu-system-i386 \
+#	~/code/qemu/build/i386-softmmu/qemu-system-i386 \
+	#
+	qemu-system-i386  \
 		-drive format=raw,file=os_image,index=0 \
 	-netdev user,id=mynet0,hostfwd=tcp::8080-:80 \
 	-device e1000,netdev=mynet0 \

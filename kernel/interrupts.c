@@ -1,5 +1,3 @@
-#pragma once
-
 #include "devices.h"
 #include <stdint.h>
 #include <stdbool.h>

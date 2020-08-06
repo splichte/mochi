@@ -3,13 +3,43 @@
 #include "interrupts.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "devices.h"
-
+#include "string.h"
 
 #define E1000_NUM_RX_DESC 32
 #define E1000_NUM_TX_DESC 8
 
 #define ETHERNET_MAX_PACKET_SIZE    1518    // in bytes
+
+
+// https://en.wikipedia.org/wiki/EtherType
+#define ETHERTYPE_IPV4  0x0800
+#define ETHERTYPE_ARP   0x0806
+#define ETHERTYPE_IPV6  0x86DD
+
+// https://en.wikipedia.org/wiki/List_of_IP_protocol_numbers
+#define IP_PROTOCOL_TCP 6
+#define IP_PROTOCOL_UDP 17
+
+
+// CRC32, from http://home.thep.lu.se/~bjorn/crc/
+// I kept the original formatting. 
+uint32_t crc32_for_byte(uint32_t r) {
+    for(int j = 0; j < 8; ++j)
+        r = (r & 1? 0: (uint32_t)0xEDB88320L) ^ r >> 1;
+    return r ^ (uint32_t)0xFF000000L;
+}
+
+void crc32(const void *data, size_t n_bytes, uint32_t* crc) {
+    static uint32_t table[0x100];
+    if(!*table)
+        for(size_t i = 0; i < 0x100; ++i)
+            table[i] = crc32_for_byte(i);
+    for(size_t i = 0; i < n_bytes; ++i)
+        *crc = table[(uint8_t)*crc ^ ((uint8_t*)data)[i]] ^ *crc >> 8;
+}
+
 
 /* packing these structs isn't necessary since they're multiples 
  * of 32 bits, but it lets you know that it's important that 
@@ -33,6 +63,34 @@ typedef struct __attribute__((packed)) {
     uint8_t css;
     uint16_t special;
 } tx_desc;
+
+/* https://tools.ietf.org/html/rfc2131#section-2 */
+// https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol#Discovery
+typedef struct __attribute__((packed)) {
+    uint8_t op;
+    uint8_t htype;
+    uint8_t hlen;
+    uint8_t hops;
+
+    uint32_t xid;
+
+    uint16_t secs;
+    uint16_t flags;
+
+    uint32_t ciaddr;
+    uint32_t yiaddr;
+    uint32_t siaddr;
+    uint32_t giaddr;
+
+    char chaddr[16];
+
+    char sname[64];
+
+    char file[128];
+
+    /* options go here */
+    // what's the standard way of doing this?
+} dhcp_msg;
 
 
 // got this from wikipedia.
@@ -294,16 +352,8 @@ pci_device get_e1000() {
     e1000.interrupt = pci_get_interrupt_line(e1000.bdf);
 
 
-    // enable bus mastering? do we need to do that?
-
-    // determine if it's mem space or io space
-    // (it's mem space)
-    //
     // evaluates to 0xfebc0000 on qemu
     e1000.bar0 = pci_get_bar0(e1000.bdf) & 0xfffffff0;
-    print("pci device bar0: \n");
-    print_word(e1000.bar0);
-
 
     return e1000;
 }
@@ -331,9 +381,7 @@ void transmit_initialization() {
     // (done above)
     //
     // 2. point TDBAL to that region. 
-    print("ring buffer location: \n");
-    uint32_t rb_loc = ((uint32_t) ring_buf) - 0xc0000000;
-    print_word(rb_loc);
+    uint32_t rb_loc = ((uint32_t) ring_buf) - KERNEL_OFFSET;
     pci_reg_write(E1000_TDBAL, rb_loc);
 
     // 3. set TDLEN to size of descriptor ring (in bytes)
@@ -351,14 +399,200 @@ void transmit_initialization() {
     pci_reg_write(E1000_TIPG, TIPGT);
 }
 
+uint16_t htons(uint16_t i) {
+    uint16_t o = 0;
+    o |= (i >> 8) & 0xff;
+    o |= (i << 8) & 0xff00;
+    return o;
+}
+
+uint32_t hton(uint32_t i) {
+    uint32_t o = 0;
+    o |= (i >> 24) & 0xff;
+    o |= (i >> 8) & 0xff00;
+    o |= (i << 8) & 0xff0000;
+    o |= (i << 24) & 0xff000000;
+    return o;
+}
+
+typedef struct {
+    // TODO: fix these? nah.
+//    uint8_t preamble[7];
+//    uint8_t sfd;
+    uint8_t mac_dest[6];
+    uint8_t mac_src[6];
+    uint16_t ethertype;
+    uint8_t buf[1500];
+    // maximum payload (1500) + frame check sequence (4), interpacket gap (12)
+//    char payload[1500]; // hmm
+//    uint32_t crc; // frame check sequence
+//    uint8_t ipg[12]; // interpacket gap
+} eth_frame;
+
+typedef struct {
+    uint8_t version_ihl;
+    uint8_t dscp_ecn;
+    uint16_t total_len;
+    uint16_t ident;
+    uint16_t flags_frag_offset;
+    uint8_t ttl;
+    uint8_t protocol;
+    uint16_t checksum;
+    uint32_t src_addr;
+    uint32_t dst_addr;
+} ip_hdr;
+
+typedef struct {
+    uint16_t src_port;
+    uint16_t dst_port;
+    uint16_t len;
+    uint16_t checksum;
+} udp_hdr;
+
+//static arp_packet ap;
+//static dhcp_msg dm;
+
+static eth_frame ef;
+
+/*
+void set_preamble(eth_frame *ef) {
+    for (int i = 0; i < 7; i++) {
+        ef->preamble[i] = 0xaa; 
+    }
+    ef->sfd = 0xab;
+}
+*/
+void ipv4_chksum(ip_hdr *ih) {
+    // at this point, the checksum field itself should be 0.
+    uint16_t chksum = 0;
+    uint8_t *ihp = (uint8_t *) ih;
+    for (int i = 0; i < sizeof(ip_hdr); i++) {
+        chksum += ihp[i];
+    }
+    ih->checksum = htons(chksum);
+}
+
 void test_transmit() {
+    // zero out eth frame
+    eth_frame e = { 0 };
+    ef = e;
+
+    // for DHCP discover
+    uint8_t dhcp_options[] = {
+        0x63, 0x82, 0x53, 0x63,
+        0x35, 0x01, 0x01,
+        0x32, 0x04, 0xc0, 0xa8, 0x01, 0x64,
+        0x37, 0x04, 0x01, 0x03, 0x0f, 0x06,
+        0xff };
+
+    //========================= IP PACKET
+    // need to support a protocol. yay. 
+
+    ip_hdr ip = { 0 };
+    ip.version_ihl = 4 << 4;
+    ip.version_ihl |= 5;
+
+    ip.total_len = htons(sizeof(ip_hdr) + sizeof(udp_hdr) + sizeof(dhcp_msg) 
+            + sizeof(dhcp_options));
+ 
+    ip.protocol = IP_PROTOCOL_UDP;
+
+    ip.src_addr = hton(0);
+    ip.dst_addr = hton(0xffffffff); // 255.255.255.255
+
+    ipv4_chksum(&ip);
+
+    memmove(ef.buf, &ip, sizeof(ip_hdr));
+
+    //====================== UDP PACKET
+    udp_hdr udp = { 0 };
+    udp.src_port = htons(68); // dhcp
+    udp.dst_port = htons(67);
+    udp.len = htons(sizeof(udp_hdr) + sizeof(dhcp_msg) + sizeof(dhcp_options));
+
+    memmove(ef.buf + sizeof(ip_hdr), &udp, sizeof(udp_hdr));
+
+    //===================== DHCP PACKET
+    //
+    // https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol#Operation
+    dhcp_msg dm = { 0 };
+    dm.hops = 0x00;
+    dm.hlen = 0x06;
+    dm.htype = 0x01;
+    dm.op = 0x01;
+    dm.xid = hton(0x3903f326);
+    dm.secs = 0x0;
+    dm.flags = 0x0;
+    dm.ciaddr = 0;
+    dm.yiaddr = 0;
+    dm.siaddr = 0;
+    dm.giaddr = 0;
+
+    // what's my mac address?
+    uint32_t mac_addr = hton(82); // from debugging output of qemu
+
+    // TODO: acquire mac addr in the "proper" way
+    memmove(dm.chaddr, &mac_addr, 16);
+
+    memmove(ef.buf + sizeof(ip_hdr) + sizeof(udp_hdr), &dm, sizeof(dhcp_msg));
+
+    // now write the DHCP options
+    uint32_t bufi = sizeof(ip_hdr) + sizeof(udp_hdr) + sizeof(dhcp_msg);
+    uint8_t *write_loc = ef.buf + bufi;
+    memmove(write_loc, dhcp_options, sizeof(dhcp_options));
+
+
+    //=================== ETHERNET PACKET
+ 
+    // we have to wrap the DHCP packet in an ethernet frame.
+    // where do we get one of those? 
+    // TODO: unclear if we should actually be setting this
+    // oh, f. I don't know if I actually need to attach 
+    // the CRC. shoot. 
+
+    //    set_preamble(&ef);
+    memset(ef.mac_dest, 0xff, 6);
+    memmove(ef.mac_src, &mac_addr, 6);
+    // how big do we want to send? 
+    // should be size of IP/UDP message. but this works.
+    ef.ethertype = htons(ETHERTYPE_IPV4); 
+
+//    uint32_t crc = 0;
+//    uint32_t content_len = sizeof(eth_frame) - 16;
+//    crc32(ef.buf, content_len, &crc);
+
+//    memmove(ef.buf+i, &crc, 4);
+    // interpacket gap
+//    memset(ef.buf+i+4, 0x00, 12); 
+
+
+    //====================================== 
+
+    // e1000 TX descriptor
+
+    tx_desc pkt = {0}; // "memset" to 0
+
+    pkt.addr = ((uint32_t) &ef) - KERNEL_OFFSET;
+
+    pkt.length = sizeof(eth_frame);
+    pkt.cmd = CMD_RS | CMD_RPS | CMD_EOP;
+
+    // send packet
+    ring_buf[0] = pkt;
+
+    pci_reg_write(E1000_TDT, 1);
+
+    while (true) {
+        if (ring_buf[0].status & STATUS_DD) {
+            print("Packet sent!\n");
+            break;
+        }
+    }
+}
+
+void test_transmit_arp() {
     // TODO: hton function
     //
-    // ok. doing "arp_packet" at ALL causes some memory thing? what? lol.
-    // is it a kernel size issue again...?
-    // RAM issue?
-    // no, the byte counts are exactly the same...
-    // what? lol
     arp_packet ap;
     ap.htype = 1;
     ap.ptype = 0x08; // reversing bytes of 0x0800
@@ -378,7 +612,11 @@ void test_transmit() {
 
     tx_desc pkt = {0}; // "memset" to 0
 
-    pkt.addr = (uint32_t) &ap;
+    pkt.addr = ((uint32_t) &ap) - KERNEL_OFFSET;
+
+
+    print("pkt addr\n");
+    print_word(pkt.addr);
     pkt.length = sizeof(arp_packet);
     pkt.cmd = CMD_RS | CMD_RPS | CMD_EOP;
 

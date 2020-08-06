@@ -7,15 +7,15 @@ void *memmove(void *dest, const void *src, size_t n) {
     // we overwrite the end of src with the front of src, 
     // before we can copy the end of src.
     // if src < (dst + n), it's fine, since we'll never lose data
-    uint8_t *dest_p = (uint8_t *) dest_p;
-    uint8_t *src_p = (uint8_t *) src_p;
+    uint8_t *dest_p = (uint8_t *) dest;
+    uint8_t *src_p = (uint8_t *) src;
 
     uint32_t di = (uint32_t) dest;
     uint32_t si = (uint32_t) src;
     if (di < si + n) {
         // copy in reverse. 
         for (size_t i = n; i > 0; i--) {
-            dest_p[i] = src_p[i];
+            dest_p[i - 1] = src_p[i - 1];
         }
     } else {
         // copy normally.
@@ -23,6 +23,7 @@ void *memmove(void *dest, const void *src, size_t n) {
             dest_p[i] = src_p[i];
         }
     }
+    return ((void *) dest_p);
 }
 
 void *memchr(const void *s, int c, size_t n) {

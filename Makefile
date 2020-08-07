@@ -20,13 +20,14 @@ run: all
 	#	-d in_asm,op,trace:memory_region*,trace:guest_mem* 
 	#	# useful:
 #	# -d in_asm,mmu,cpu_reset
-#	~/code/qemu/build/i386-softmmu/qemu-system-i386 \
-	#
-	qemu-system-i386  \
+#	~/code/qemu/i386-softmmu/qemu-system-i386 \
+	#	-netdev user,id=mynet0,hostfwd=tcp::8080-:80 
+#
+	~/code/qemu/i386-softmmu/qemu-system-i386 \
 		-drive format=raw,file=os_image,index=0 \
-	-netdev user,id=mynet0,hostfwd=tcp::8080-:80 \
-	-device e1000,netdev=mynet0 \
-	-object filter-dump,id=f1,netdev=mynet0,file=netdump.dat
+	-netdev user,id=u1 \
+	-device e1000,netdev=u1 \
+	-object filter-dump,id=f1,netdev=u1,file=netdump.dat
 
 os_image: boot/boot_sect.bin boot/switch_to_pm.bin boot/bootloader.bin kernel.bin
 	./prepare_image.sh

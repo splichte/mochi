@@ -462,14 +462,41 @@ void set_preamble(eth_frame *ef) {
     ef->sfd = 0xab;
 }
 */
+
+// https://en.wikipedia.org/wiki/IPv4_header_checksum
 void ipv4_chksum(ip_hdr *ih) {
     // at this point, the checksum field itself should be 0.
-    uint16_t chksum = 0;
+    uint32_t chksum = 0;
     uint8_t *ihp = (uint8_t *) ih;
-    for (int i = 0; i < sizeof(ip_hdr); i++) {
-        chksum += ihp[i];
+    for (int i = 0; i < sizeof(ip_hdr); i += 2) {
+        uint16_t hi = ((uint16_t) ihp[i]) << 8;
+        uint16_t lo = ((uint16_t) ihp[i+1]);
+        chksum += hi + lo;
     }
-    ih->checksum = htons(chksum);
+
+    uint8_t carry_count = (chksum / 0x10000);
+
+    uint16_t sum16 = chksum & 0xffff;
+    
+    uint32_t ochk = sum16 + carry_count;
+    carry_count = (ochk / 0x10000);
+    ochk = ochk - 0x10000 + carry_count;
+
+    uint16_t f16 = ochk & 0xffff;
+    f16 = ~(f16 & f16); // invert all bits
+    ih->checksum = htons(f16);
+}
+
+void ip_cksum_test() {
+    // example from Wikipedia
+    uint8_t arr[] = {
+        0x45, 0x00, 0x00, 0x73, 0x00, 0x00, 0x40, 0x00, 
+        0x40, 0x11, 0x00, 0x00, 0xc0, 0xa8, 0x00, 0x01, 
+        0xc0, 0xa8, 0x00, 0xc7,
+    };
+
+    print("ip cksum test: \n");
+    ipv4_chksum((ip_hdr *) arr); // expected: 0xb861
 }
 
 void test_transmit() {
@@ -486,11 +513,12 @@ void test_transmit() {
         0xff };
 
     //========================= IP PACKET
-    // need to support a protocol. yay. 
 
     ip_hdr ip = { 0 };
     ip.version_ihl = 4 << 4;
     ip.version_ihl |= 5;
+
+    ip.ttl = 0xff; // just needs to be nonzero.
 
     ip.total_len = htons(sizeof(ip_hdr) + sizeof(udp_hdr) + sizeof(dhcp_msg) 
             + sizeof(dhcp_options));
@@ -500,9 +528,12 @@ void test_transmit() {
     ip.src_addr = hton(0);
     ip.dst_addr = hton(0xffffffff); // 255.255.255.255
 
+    // need to be VERY careful about endianness.
     ipv4_chksum(&ip);
 
     memmove(ef.buf, &ip, sizeof(ip_hdr));
+
+
 
     //====================== UDP PACKET
     udp_hdr udp = { 0 };
@@ -512,21 +543,18 @@ void test_transmit() {
 
     memmove(ef.buf + sizeof(ip_hdr), &udp, sizeof(udp_hdr));
 
+
+
+
     //===================== DHCP PACKET
     //
     // https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol#Operation
     dhcp_msg dm = { 0 };
-    dm.hops = 0x00;
     dm.hlen = 0x06;
     dm.htype = 0x01;
     dm.op = 0x01;
     dm.xid = hton(0x3903f326);
-    dm.secs = 0x0;
-    dm.flags = 0x0;
-    dm.ciaddr = 0;
-    dm.yiaddr = 0;
-    dm.siaddr = 0;
-    dm.giaddr = 0;
+
 
     // what's my mac address?
     uint32_t mac_addr = hton(82); // from debugging output of qemu

@@ -1,5 +1,5 @@
 #include "screen.h"
-#include "../kernel/hardware.h"
+#include "hardware.h"
 
 #define VIDEO_ADDRESS 0xb8000
 #define MAX_ROWS 25

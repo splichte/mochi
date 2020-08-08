@@ -1,6 +1,6 @@
 #include "process.h"
 #include "memory.h"
-#include "../drivers/screen.h"
+#include "screen.h"
 #include "interrupts.h"
 
 static process *current_process;

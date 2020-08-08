@@ -1,7 +1,7 @@
 #include "devices.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "../drivers/screen.h"
+#include "screen.h"
 #include "hardware.h"
 
 // NOTE: exceptions push different things on the stack than do interrupts.

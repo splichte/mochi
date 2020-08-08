@@ -1,7 +1,7 @@
 #include <stdint.h>
-#include "../drivers/disk.h"
-#include "../kernel/hardware.h"
-#include "../drivers/screen.h"
+#include "disk.h"
+#include "hardware.h"
+#include "screen.h"
 
 // The page directory is located at the 
 // start at the 2nd page table, address 0x40.0000

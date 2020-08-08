@@ -4,10 +4,10 @@
 #include <stdint.h>
 #include "fs.h"
 #include "hardware.h"
-#include "../drivers/disk.h"
+#include "disk.h"
 #include "kalloc.h"
 #include "string.h"
-#include "../drivers/screen.h"
+#include "screen.h"
 
 #define S_BLOCK_SIZE    (1024 << super.s_log_block_size)
 

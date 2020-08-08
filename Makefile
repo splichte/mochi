@@ -1,11 +1,11 @@
-C_SOURCES = $(wildcard kernel/*.c drivers/*.c)
-HEADERS = $(wildcard kernel/*.h drivers/*.h)
+C_SOURCES = $(wildcard kernel/*.c net/*.c drivers/*.c)
+HEADERS = $(wildcard include/*.h)
 
 # Convert the *.c files to *.o
 OBJ = ${C_SOURCES:.c=.o}
 DEBUG_OBJ = ${C_SOURCES:.c=.debug.o}
 
-all: os_image
+all: os.img
 
 debug: kernel.debug
 	/usr/local/Cellar/binutils/2.34/bin/objdump -S -d kernel.debug > dis.txt
@@ -24,13 +24,13 @@ run: all
 	#	-netdev user,id=mynet0,hostfwd=tcp::8080-:80 
 #
 	~/code/qemu/i386-softmmu/qemu-system-i386 \
-		-drive format=raw,file=os_image,index=0 \
+		-drive format=raw,file=os.img,index=0 \
 	-netdev user,id=u1 \
 	-device e1000,netdev=u1 \
 	-object filter-dump,id=f1,netdev=u1,file=netdump.dat
 
-os_image: boot/boot_sect.bin boot/switch_to_pm.bin boot/bootloader.bin kernel.bin
-	./prepare_image.sh
+os.img: boot/boot_sect.bin boot/switch_to_pm.bin boot/bootloader.bin kernel.bin
+	./script/prepare_image.sh
 
 boot/boot_sect.bin: boot/boot_sect.asm
 	nasm $< -f bin -o $@
@@ -53,10 +53,10 @@ kernel.debug: kernel/kernel_entry.debug.o kernel/timer_irq.debug.o kernel/fork.d
 
 # -mgeneral-regs-only lets you use __attribute__((interrupt))
 %.o : %.c ${HEADERS}
-	i386-elf-gcc -mgeneral-regs-only -ffreestanding -c $< -o $@
+	i386-elf-gcc -I./include -mgeneral-regs-only -ffreestanding -c $< -o $@
 
 %.debug.o : %.c ${HEADERS}
-	i386-elf-gcc -g -mgeneral-regs-only -ffreestanding -c $< -o $@
+	i386-elf-gcc -I./include -g -mgeneral-regs-only -ffreestanding -c $< -o $@
 
 # boot_sect.bin
 # kernel_entry.o, timer_handler.o
@@ -67,5 +67,5 @@ kernel.debug: kernel/kernel_entry.debug.o kernel/timer_irq.debug.o kernel/fork.d
 	nasm $< -f elf -o $@
 
 clean: 
-	rm -rf *.bin *.o os_image kernel.debug
+	rm -rf *.bin *.o os.img kernel.debug
 	rm -rf kernel/*.o boot/*.o boot/*.bin drivers/*.o

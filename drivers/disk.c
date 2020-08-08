@@ -1,7 +1,7 @@
 #include "disk.h"
 #include "screen.h"
-#include "../kernel/fs.h" // temporary!
-#include "../kernel/hardware.h"
+#include "fs.h" // temporary!
+#include "hardware.h"
 
 // Talk to hard disk using ATA (Advanced Technology Attachment)
 // Most of this is from: http://lateblt.tripod.com/atapi.htm

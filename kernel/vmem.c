@@ -3,7 +3,7 @@
 #include "memory.h"
 #include "hardware.h"
 #include "devices.h"
-#include "../drivers/screen.h"
+#include "screen.h"
 
 __attribute__ ((interrupt))
 void page_fault_handler(struct interrupt_frame *frame, uint32_t error_code) {

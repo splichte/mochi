@@ -1,4 +1,4 @@
-#include "../drivers/screen.h"
+#include "screen.h"
 #include "hardware.h"
 #include "interrupts.h"
 #include <stdint.h>

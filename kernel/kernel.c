@@ -1,5 +1,5 @@
-#include "../drivers/screen.h"
-#include "../drivers/disk.h"
+#include "screen.h"
+#include "disk.h"
 #include "hardware.h"
 #include "interrupts.h"
 #include "process.h"

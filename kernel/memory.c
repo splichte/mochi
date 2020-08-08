@@ -1,6 +1,6 @@
 #include "memory.h"
 #include "hardware.h"
-#include "../drivers/screen.h"
+#include "screen.h"
 #include <stdint.h>
 #include <stddef.h>
 

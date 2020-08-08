@@ -5,7 +5,7 @@
  *
  */
 #include <stdint.h>
-#include "../drivers/disk.h"
+#include "disk.h"
 
 #define ROOT_USR    0
 

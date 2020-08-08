@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include "fs.h"
 #include "hardware.h"
-#include "../drivers/disk.h"
-#include "../drivers/screen.h"
+#include "disk.h"
+#include "screen.h"
 #include "string.h"
 
 // TODO: dynamically calculate.

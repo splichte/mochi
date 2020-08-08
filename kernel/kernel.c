@@ -9,6 +9,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+// TODO: remove these later~
+#include "net.h"
+#include "e1000.h"
+
 void test_sb_writes() {
     superblock_t out = { 0 };
     out.s_inodes_count = 12;
@@ -107,7 +111,7 @@ int kmain() {
     // turned on.
 
     // 
-    transmit_initialization();
+    initialize_e1000();
     print("transmit init done\n");
     test_transmit();
     print("test transmit done\n");

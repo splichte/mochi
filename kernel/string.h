@@ -1,3 +1,5 @@
+#pragma once
+
 /* string.h -- implements some of the standard interface. */
 /* https://en.wikibooks.org/wiki/C_Programming/string.h */
 /* or K&R C, Appendix B Section B3. */

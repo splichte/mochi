@@ -11,7 +11,7 @@ typedef struct {
 } udp_hdr;
 
 
-int send_udp(uint8_t *pkt, uint16_t len, uint16_t src_port, uint16_t dst_port) {
+int send_pkt_to_udp(uint8_t *pkt, uint16_t len, uint16_t src_port, uint16_t dst_port) {
     //====================== UDP PACKET
     //
     uint16_t udp_pkt_len = sizeof(udp_hdr) + len;
@@ -26,6 +26,24 @@ int send_udp(uint8_t *pkt, uint16_t len, uint16_t src_port, uint16_t dst_port) {
     memmove(udp_pkt + sizeof(udp_hdr), pkt, len);
 
     // send
-    return send_ip(udp_pkt, udp_pkt_len, IP_PROTOCOL_UDP);
+    return send_pkt_to_ip(udp_pkt, udp_pkt_len, IP_PROTOCOL_UDP);
+}
+
+uint8_t *recv_pkt_from_udp(uint16_t *src_port, uint16_t *dst_port) {
+    uint8_t protocol;
+    uint8_t *pkt = recv_pkt_from_ip(&protocol);
+    if (protocol != IP_PROTOCOL_UDP) return NULL;
+
+    udp_hdr *hdr = (udp_hdr *) pkt;
+    *src_port = hdr->src_port;
+    *dst_port = hdr->dst_port;
+
+    uint8_t *ret = kmalloc(hdr->len);
+
+    memmove(ret, pkt+sizeof(udp_hdr), hdr->len);
+
+    kfree(pkt);
+
+    return ret;
 }
 

@@ -1,19 +1,8 @@
 #include <stdint.h>
+#include "screen.h"
+#include "string.h"
 #include "net.h"
-
-typedef struct {
-    uint8_t version_ihl;
-    uint8_t dscp_ecn;
-    uint16_t total_len;
-    uint16_t ident;
-    uint16_t flags_frag_offset;
-    uint8_t ttl;
-    uint8_t protocol;
-    uint16_t checksum;
-    uint32_t src_addr;
-    uint32_t dst_addr;
-} ip_hdr;
-
+#include "ip.h"
 
 // https://en.wikipedia.org/wiki/IPv4_header_checksum
 void ipv4_cksum(ip_hdr *ih) {
@@ -53,7 +42,7 @@ void ip_cksum_test() {
 
 
 // can be either TCP or UDP
-int send_ip(int8_t *tpkt, uint16_t tlen, uint8_t protocol) {
+int send_pkt_to_ip(uint8_t *tpkt, uint16_t tlen, uint8_t protocol) {
     uint32_t ip_pkt_len = tlen + sizeof(ip_hdr);
 
     ip_hdr ip = { 0 };
@@ -77,7 +66,26 @@ int send_ip(int8_t *tpkt, uint16_t tlen, uint8_t protocol) {
     memmove(ip_pkt, &ip, sizeof(ip_hdr));
     memmove(ip_pkt + sizeof(ip_hdr), tpkt, tlen);
 
-    return send_eth(ip_pkt, ip_pkt_len);
+    return send_ip_pkt_to_eth(ip_pkt, ip_pkt_len);
 }
 
+uint8_t *recv_pkt_from_ip(uint8_t *protocol) {
+    uint8_t *buf = recv_ip_pkt_from_eth();
+
+    ip_hdr *hdr = (ip_hdr *) buf;
+    *protocol = hdr->protocol;
+
+    print("checking ip packet\n");
+    print_word(hdr->protocol); // looks good.
+
+    uint32_t payload_len = hdr->total_len - sizeof(ip_hdr);
+
+    uint8_t *pkt = kmalloc(payload_len);
+
+    memmove(pkt, buf + sizeof(ip_hdr), payload_len);
+
+    kfree(buf); // don't need buf anymore. 
+
+    return pkt;
+}
 

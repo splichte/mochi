@@ -7,6 +7,7 @@
 #include "devices.h"
 #include "string.h"
 #include "eth.h"
+#include "net.h"
 
 #define E1000_NUM_RX_DESC 32
 #define E1000_NUM_TX_DESC 8
@@ -16,6 +17,9 @@
 #define E1000_EEPROM_REGISTER           0x00014
 #define E1000_CTRL_EXT_REGISTER         0x00018
 
+// Interrupt Mask/Set Register
+#define E1000_IMS                       0x000d0
+
 /* these are the names from the Intel docs. */
 #define E1000_RCTL                      0x00100
 #define E1000_RDBAL                     0x02800
@@ -24,15 +28,22 @@
 #define E1000_RDT                       0x02818
 
 #define E1000_TCTL                      0x00400
-#define E1000_TIPG                      0x00410 /* e1000 in qEMU thinks this is unknown*/
+#define E1000_TIPG                      0x00410
 #define E1000_TDBAL                     0x03800
 #define E1000_TDLEN                     0x03808
 #define E1000_TDH                       0x03810
 #define E1000_TDT                       0x03818
 
-#define E1000_RX_ADDR_REGISTER          0x05400
+#define E1000_MTA                       0x05200
+#define E1000_MTA_LEN                   128 // goes to 0x053fc
+
+#define E1000_RAL                       0x05400
+#define E1000_RAH                       0x05404
+
+
 
 /* Straight up copied from ToaruOS. */
+// TODO: only use the ones we need. 
 #define RCTL_EN                         (1 << 1)    /* Receiver Enable */
 #define RCTL_SBP                        (1 << 2)    /* Store Bad Packets */
 #define RCTL_UPE                        (1 << 3)    /* Unicast Promiscuous Enabled */
@@ -252,7 +263,7 @@ uint32_t pci_reg_read(uint16_t port) {
 /* packing these structs isn't necessary since they're multiples 
  * of 32 bits, but it lets you know that it's important that 
  * they are precise. */
-struct __attribute__((packed)) {
+typedef struct __attribute__((packed)) {
     uint64_t addr;
     uint16_t length;
     uint16_t checksum;
@@ -272,13 +283,19 @@ typedef struct __attribute__((packed)) {
     uint16_t special;
 } tx_desc;
 
-/* tx descriptors. */
 static tx_desc ring_buf[E1000_NUM_TX_DESC];
 
+static rx_desc rx_list[E1000_NUM_RX_DESC] __attribute__((aligned (16)));
+
+#define RCTL_BSIZE 2048 // this is the default (in RCTL)
+static uint8_t rx_bufs[E1000_NUM_RX_DESC][RCTL_BSIZE];
+static uint16_t rx_i = 0;
 
 // we can dump this
 void initialize_e1000() {
     eth = get_e1000();
+
+    //=================== Transmit Initialization
 
     // 1. allocate a region of memory for transmit descriptor list. 
     // (done above)
@@ -300,6 +317,48 @@ void initialize_e1000() {
 
     // 6. set Transmit IPG
     pci_reg_write(E1000_TIPG, TIPGT);
+
+
+    //=================== Receive Initialization
+
+    // 1. program the receive address register(s) with the desired 
+    // ethernet addresses.
+    pci_reg_write(E1000_RAL, MAC_ADDR_LO);
+
+    // E1000_RAH_AV (p.344)
+    pci_reg_write(E1000_RAH, MAC_ADDR_HI | (1 << 31));
+
+
+    // 2. initialize the MTA (multicast table array) to 0x0
+    uint32_t mta_i = E1000_MTA;
+    for (int i = 0; i < E1000_MTA_LEN; i++) {
+        pci_reg_write(mta_i, 0);
+    }
+
+    // 3. program the IMS register (interrupt mask)
+    pci_reg_write(E1000_IMS, 0); 
+
+    // 4. allocate memory for receive descriptor list. 
+    // program RDBAL with the address of this region.
+    // set the rx list values to point to the buffer locations.
+    uint32_t rloc = ((uint32_t) rx_list) - KERNEL_OFFSET;
+    pci_reg_write(E1000_RDBAL, rloc);
+
+    for (int i = 0; i < E1000_NUM_RX_DESC; i++) {
+        rx_list[i].addr = ((uint32_t) (rx_bufs + i)) - KERNEL_OFFSET;
+    }
+
+    // 5. set RDLEN to size of descriptor ring (in bytes)
+    pci_reg_write(E1000_RDLEN, E1000_NUM_RX_DESC * sizeof(rx_desc));
+
+    // 6. initialize RDH/RDT
+    pci_reg_write(E1000_RDH, 0);
+    pci_reg_write(E1000_RDT, E1000_NUM_RX_DESC);
+
+    // 7. program RCTL
+    // (enable broadcast since that's what DHCP server 
+    // sends us back).
+    pci_reg_write(E1000_RCTL, RCTL_EN | RCTL_BAM);
 }
 
 
@@ -309,7 +368,7 @@ void initialize_e1000() {
  */
 static eth_pkt epkt;
 
-void send_e1000(const eth_pkt *ep) {
+void send_eth_to_e1000(const eth_pkt *ep) {
     // copy user's packet over to our packet area, 
     // where we know the location in physical memory.
     epkt = *ep;
@@ -336,9 +395,35 @@ void send_e1000(const eth_pkt *ep) {
     }
 }
 
-int recv_eth_pkt(uint8_t *buf) {
-    // TODO
+void update_rxi() {
+    rx_i++; if (rx_i >= E1000_NUM_RX_DESC) rx_i = 0;
 }
 
-// can I shove the ethernet stuff in here?
+
+uint8_t *get_next_rxbuf() {
+    while (!(rx_list[rx_i].status & STATUS_DD)) {
+        // busy wait
+    }
+    uint8_t *buf = rx_bufs[rx_i];
+
+    // "consume" this entry
+    rx_list[rx_i].status = 0;
+    update_rxi();
+
+
+    return buf;
+}
+
+// TODO: would be GREAT to have an interrupt
+// that copies to virtual memory right away when a packet is received
+// or when the descriptor list is full...?
+eth_pkt recv_eth_from_e1000() {
+    uint8_t *buf = get_next_rxbuf();
+
+    // dereference + copy so we don't lose the packet. 
+    eth_pkt ret = *((eth_pkt *) buf);
+
+    return ret;
+}
+
 

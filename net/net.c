@@ -17,4 +17,7 @@ uint32_t hton(uint32_t i) {
     return o;
 }
 
+uint8_t MAC_ADDR_ARR[6] = {
+    0x52, 0x54, 0x00, 0x12, 0x34, 0x56
+};
 

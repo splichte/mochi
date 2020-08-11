@@ -17,7 +17,7 @@ typedef struct {
     uint8_t buf[ETH_MAX_PAYLOAD_LEN];
 } eth_pkt;
 
-int send_eth(uint8_t *pkt, uint32_t len);
+int send_ip_pkt_to_eth(uint8_t *pkt, uint32_t len);
 
-//int recv_eth(uint8_t *pkt, uint32_t *len);
+uint8_t *recv_ip_pkt_from_eth();
 

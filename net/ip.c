@@ -75,9 +75,6 @@ uint8_t *recv_pkt_from_ip(uint8_t *protocol) {
     ip_hdr *hdr = (ip_hdr *) buf;
     *protocol = hdr->protocol;
 
-    print("checking ip packet\n");
-    print_word(hdr->protocol); // looks good.
-
     uint32_t payload_len = hdr->total_len - sizeof(ip_hdr);
 
     uint8_t *pkt = kmalloc(payload_len);

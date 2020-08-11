@@ -15,7 +15,24 @@ extern uint8_t MAC_ADDR_ARR[6];
 #define MAC_ADDR_HI 0x00005634
 
 uint16_t htons(uint16_t i);
-
 uint32_t hton(uint32_t i);
+uint16_t ntohs(uint16_t i);
+uint32_t ntoh(uint32_t i);
+
+
+typedef struct {
+    uint32_t ip_addr;
+    uint32_t router_ip;
+    uint32_t subnet_mask;
+    uint32_t ip_lease_time;
+    uint32_t dhcp_server;
+    uint32_t dns_servers[256];
+} ip_config_t;
+
+extern ip_config_t ip_config;
+
+void print_ip_config();
 
 void test_transmit();
+
+

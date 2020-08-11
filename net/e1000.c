@@ -387,12 +387,8 @@ void send_eth_to_e1000(const eth_pkt *ep) {
 
     pci_reg_write(E1000_TDT, 1);
 
-    while (true) {
-        if (ring_buf[0].status & STATUS_DD) {
-            print("Packet sent!\n");
-            break;
-        }
-    }
+    // busy wait until packet is sent.
+    while (!(ring_buf[0].status & STATUS_DD)) { }
 }
 
 void update_rxi() {

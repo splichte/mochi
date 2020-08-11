@@ -117,9 +117,8 @@ void clear_screen() {
 // TODO: I'm sure there's a better way to do this. 
 void print_byte(uint8_t i) {
     // max value of 256
-    char s[5];
-    s[4] = '\0';
-    s[3] = '\n';
+    char s[4];
+    s[3] = '\0';
 
     int hundreds_place = (i / 100);
     s[0] = hundreds_place + '0';
@@ -130,7 +129,11 @@ void print_byte(uint8_t i) {
     int ones_place = i - (hundreds_place * 100) - (tens_place * 10);
     s[2] = ones_place + '0';
 
-    print(s);
+    char *start = s;
+    if (hundreds_place == 0) start++;
+    if (tens_place == 0) start++;
+
+    print(start);
 }
 
 /* print word as hex */

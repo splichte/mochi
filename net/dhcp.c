@@ -9,6 +9,22 @@
 #include "net.h"
 #include "udp.h"
 
+
+#define DHCP_OPT_MSG_TYPE       53
+#define DHCP_OPT_SUBNET_MASK    1
+#define DHCP_OPT_ROUTER         3
+#define DHCP_OPT_IP_LEASE_TIME  51
+#define DHCP_OPT_SERVER         54
+#define DHCP_OPT_DNS_SERVERS    6
+
+#define DHCP_MSG_TYPE_DISCOVER  1
+#define DHCP_OPT_PARAM_REQ_LIST 55
+
+#define DHCP_OPT_END            255
+
+// unset, at the start. 
+ip_config_t ip_config = { 0 };
+
 /* https://tools.ietf.org/html/rfc2131#section-2 */
 // https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol#Discovery
 typedef struct __attribute__((packed)) {
@@ -34,7 +50,6 @@ typedef struct __attribute__((packed)) {
     char file[128];
 
     /* options go here */
-    // what's the standard way of doing this?
 } dhcp_hdr;
 
 #define DHCP_SRC_PORT   68
@@ -69,17 +84,85 @@ void send_dhcp_discover() {
     send_pkt_to_udp(dhcp_pkt, dhcp_pkt_len, DHCP_SRC_PORT, DHCP_DST_PORT);
 }
 
-void test_transmit() {
-    send_dhcp_discover();
-
+void read_dhcp_offer() {
     uint16_t src_port, dst_port;
     uint8_t *pkt = recv_pkt_from_udp(&src_port, &dst_port);
+
 
     // pkt should be a DHCP offer. 
     dhcp_hdr *hdr = (dhcp_hdr *) pkt;
 
-    // 0a 00 02 0f (little-endian)
-    print_word(hdr->yiaddr);
+    ip_config.ip_addr = ntoh(hdr->yiaddr);
+
+    // parse options
+    uint8_t *p = ((uint8_t *) hdr) + sizeof(dhcp_hdr);
+    p += 4; // skip the magic DHCP cookie.
+
+    while (*p != DHCP_OPT_END) {
+        switch (*p) {
+            case DHCP_OPT_MSG_TYPE: {
+                p += 3;
+                break;
+            }
+            case DHCP_OPT_SUBNET_MASK: {
+                p += 2;
+                ip_config.subnet_mask = ntoh(*((uint32_t *) p));
+                p += 4;
+                break;
+            }
+            case DHCP_OPT_ROUTER: {
+                p += 2;
+                ip_config.router_ip = ntoh(*((uint32_t *) p));
+                p += 4;
+                break;
+            }
+            case DHCP_OPT_IP_LEASE_TIME: {
+                p += 2;
+                ip_config.ip_lease_time = ntoh(*((uint32_t *) p));
+                p += 4;
+                break;
+            }
+            case DHCP_OPT_SERVER: {
+                p += 2;
+                ip_config.dhcp_server = ntoh(*((uint32_t *) p));
+                p += 4;
+                break;
+            }
+            case DHCP_OPT_DNS_SERVERS: {
+                p++;
+                uint8_t len = *p++;
+                for (int i = 0; i < len / 4; i++, p += 4) {
+                    ip_config.dns_servers[i] = ntoh(*((uint32_t *) p));
+                }
+                break;
+            }
+            default:  // FIXME. need to read the option type to know 
+                      // how much to advance p
+                p++;
+                break;
+        }
+    }
+}
+
+void send_dhcp_request() {
+
+}
+
+void read_dhcp_ack() {
+
+}
+
+void test_transmit() {
+    send_dhcp_discover();
+
+    read_dhcp_offer();
+
+    // debugging
+    print_ip_config();
+
+    send_dhcp_request();
+
+    read_dhcp_ack();
 }
 
 

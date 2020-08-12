@@ -88,7 +88,6 @@ void read_dhcp_offer() {
     uint16_t src_port, dst_port;
     uint8_t *pkt = recv_pkt_from_udp(&src_port, &dst_port);
 
-
     // pkt should be a DHCP offer. 
     dhcp_hdr *hdr = (dhcp_hdr *) pkt;
 
@@ -145,24 +144,86 @@ void read_dhcp_offer() {
 }
 
 void send_dhcp_request() {
+    // use ip_config
 
+    // TODO: better abstraction, like a resizing queue or something
+    uint8_t dhcp_options[] = {
+        0x63, 0x82, 0x53, 0x63,
+        53, 1, 3,
+        50, 4, 
+        ip_config.ip_addr >> 24,
+        (ip_config.ip_addr >> 16) & 0xff,
+        (ip_config.ip_addr >> 8) & 0xff,
+        (ip_config.ip_addr & 0xff),
+        54, 4, 
+        ip_config.dhcp_server >> 24,
+        (ip_config.dhcp_server >> 16) & 0xff,
+        (ip_config.dhcp_server >> 8) & 0xff,
+        (ip_config.dhcp_server & 0xff),
+        0xff };
+
+    uint16_t dhcp_pkt_len = sizeof(dhcp_hdr) + sizeof(dhcp_options);
+    uint8_t dhcp_pkt[dhcp_pkt_len];
+
+    dhcp_hdr dm = { 0 };
+    dm.hlen = 0x06;
+    dm.htype = 0x01;
+    dm.op = 0x01;
+    dm.xid = hton(0x3903f326);
+
+    memmove(dm.chaddr, MAC_ADDR_ARR, 6); 
+    memmove(dm.siaddr, ip_config.dhcp_server, 4);
+
+    memmove(dhcp_pkt, &dm, sizeof(dhcp_hdr));
+    memmove(dhcp_pkt + sizeof(dhcp_hdr), dhcp_options, sizeof(dhcp_options));
+
+    send_pkt_to_udp(dhcp_pkt, dhcp_pkt_len, DHCP_SRC_PORT, DHCP_DST_PORT);
 }
 
 void read_dhcp_ack() {
+    uint16_t src_port, dst_port;
+    uint8_t *pkt = recv_pkt_from_udp(&src_port, &dst_port);
 
+    // pkt should be a DHCP offer. 
+    dhcp_hdr *hdr = (dhcp_hdr *) pkt;
+
+    ip_config.ip_addr = ntoh(hdr->yiaddr);
+
+    // parse options
+    uint8_t *p = ((uint8_t *) hdr) + sizeof(dhcp_hdr);
+    p += 4; // skip the magic DHCP cookie.
+
+    uint8_t ack = 0;
+    while (*p != DHCP_OPT_END && !ack) {
+        switch (*p) {
+            case 53:
+                p += 2;
+                if (*p == 5) {
+                   ack = 1;
+                }
+                break;
+            default:
+                p++;
+        }
+    }
+
+    // if we don't get an acknowledge, just error out for now.
+    if (!ack) {
+        sys_exit();
+    }
 }
 
-void test_transmit() {
+void dhcp_bootstrap_ip() {
     send_dhcp_discover();
 
     read_dhcp_offer();
 
-    // debugging
-    print_ip_config();
-
     send_dhcp_request();
 
     read_dhcp_ack();
+
+    print("DHCP initialization complete.\n");
+    print_ip_config();
 }
 
 

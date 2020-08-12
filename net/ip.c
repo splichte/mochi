@@ -46,8 +46,8 @@ int send_pkt_to_ip(uint8_t *tpkt, uint16_t tlen, uint8_t protocol) {
     uint32_t ip_pkt_len = tlen + sizeof(ip_hdr);
 
     ip_hdr ip = { 0 };
-    ip.version_ihl = 4 << 4;
-    ip.version_ihl |= 5;
+    ip.version = 4;
+    ip.header_len = 5;
 
     ip.ttl = 0xff; // just needs to be nonzero.
 

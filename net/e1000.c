@@ -368,6 +368,13 @@ void initialize_e1000() {
  */
 static eth_pkt epkt;
 
+static uint16_t tx_i = 0;
+
+void update_txi() {
+    tx_i++; if (tx_i >= E1000_NUM_TX_DESC) tx_i = 0;
+}
+
+
 void send_eth_to_e1000(const eth_pkt *ep) {
     // copy user's packet over to our packet area, 
     // where we know the location in physical memory.
@@ -383,12 +390,13 @@ void send_eth_to_e1000(const eth_pkt *ep) {
 
     // FIXME: track the current index. maintain the positioning of the queue.
     // send packet
-    ring_buf[0] = pkt;
+    ring_buf[tx_i] = pkt;
 
-    pci_reg_write(E1000_TDT, 1);
+    pci_reg_write(E1000_TDT, tx_i + 1);
 
     // busy wait until packet is sent.
-    while (!(ring_buf[0].status & STATUS_DD)) { }
+    while (!(ring_buf[tx_i].status & STATUS_DD)) { }
+    update_txi();
 }
 
 void update_rxi() {

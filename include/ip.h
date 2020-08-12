@@ -7,7 +7,8 @@
 #define IP_PROTOCOL_UDP 17
 
 typedef struct {
-    uint8_t version_ihl;
+    uint8_t header_len:4,
+            version:4;
     uint8_t dscp_ecn;
     uint16_t total_len;
     uint16_t ident;

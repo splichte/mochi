@@ -33,6 +33,6 @@ extern ip_config_t ip_config;
 
 void print_ip_config();
 
-void test_transmit();
+void dhcp_bootstrap_ip();
 
 

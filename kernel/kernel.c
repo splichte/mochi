@@ -105,16 +105,8 @@ int kmain() {
 
 //    test_fs();
 
-
-
-    // turned these off for now...since we have virtual memory 
-    // turned on.
-
-    // 
     initialize_e1000();
-    print("transmit init done\n");
-    test_transmit();
-    print("test transmit done\n");
+    dhcp_bootstrap_ip();
 
     // test processes.
 //    init_root_process();

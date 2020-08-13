@@ -11,7 +11,7 @@
      __attribute__((interrupt)) \
     void interrupt_##i(struct interrupt_frame *frame) { \
         asm volatile ("cli"); \
-        print_byte(i);\
+        print_byte(i); print("\n");\
         if (i >= 32 && i < 48) { \
             if (i > 39 && i < 48) { \
                 port_byte_out(PIC2A, PIC_EOI); \
@@ -21,6 +21,7 @@
         asm volatile ("sti"); \
     } \
 
+
 #define EXCEPTION(i) \
      __attribute__((interrupt)) \
     void interrupt_##i(struct interrupt_frame *frame) { \
@@ -28,7 +29,7 @@
         print("exception #: "); print_byte(i);\
         print("instruction: "); \
         print_word(frame->ip);\
-        HALT();\
+        sys_exit();\
         asm volatile ("sti"); \
     } \
 
@@ -40,7 +41,7 @@
         print("exception #: "); print_byte(i);\
         print("instruction: "); \
         print_word(frame->ip);\
-        HALT();\
+        sys_exit();\
         asm volatile ("sti"); \
     } \
 
@@ -97,7 +98,7 @@ INT(39);
 INT(40);
 INT(41);
 INT(42);
-INT(43);
+// INT(43); // internet
 INT(44);
 INT(45);
 INT(46);
@@ -197,9 +198,15 @@ extern void timer_handler(struct interrupt_frame *frame);
 void setup_interrupt_descriptor_table() {
     // Operation Command Byte 1 [2]
     // 0xfc == 1111 1100 == disable all but keyboard (IRQ1)
-    // and timer (IRQ0)
-    port_byte_out(PIC1B, 0xfd);
-    port_byte_out(PIC2B, 0xff);
+    // and timer (IRQ0). 0xfd to disable timer. 
+    // 0xf9 = 1111 1001 = e1000 (IRQ2)
+    // was 0xfd and 0xff before.
+    // 
+    port_byte_out(PIC1B, 0xf9); // 1001   1001. 
+    port_byte_out(PIC2B, 0xf7); // 0xf7 triggers when above is. 0xf1
+
+    // 0xf9 = 1111 1001
+    // 0xf7 = 1111 0111
 
 //    timer_setup();
 
@@ -239,9 +246,10 @@ void setup_interrupt_descriptor_table() {
     idt[29] = set_gate((uint32_t) &interrupt_29);
     idt[30] = set_gate((uint32_t) &interrupt_30);
     idt[31] = set_gate((uint32_t) &interrupt_31);
+    // FIXME: where are the interrupts documented?
     idt[32] = set_gate((uint32_t) &interrupt_32); // remove me
 //    idt[32] = set_gate((uint32_t) &timer_handler); // timer!!
-    
+
     idt[33] = set_gate((uint32_t) &kbd_handler); // keyboard!!
     idt[34] = set_gate((uint32_t) &interrupt_34);
     idt[35] = set_gate((uint32_t) &interrupt_35);
@@ -252,7 +260,7 @@ void setup_interrupt_descriptor_table() {
     idt[40] = set_gate((uint32_t) &interrupt_40);
     idt[41] = set_gate((uint32_t) &interrupt_41);
     idt[42] = set_gate((uint32_t) &interrupt_42);
-    idt[43] = set_gate((uint32_t) &interrupt_43); // internet, supposedly
+    idt[43] = set_gate((uint32_t) &e1000_interrupt); // internet
     idt[44] = set_gate((uint32_t) &interrupt_44);
     idt[45] = set_gate((uint32_t) &interrupt_45);
     idt[46] = set_gate((uint32_t) &interrupt_46);

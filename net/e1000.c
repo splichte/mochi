@@ -8,6 +8,7 @@
 #include "string.h"
 #include "eth.h"
 #include "net.h"
+#include "kalloc.h"
 
 #define E1000_NUM_RX_DESC 32
 #define E1000_NUM_TX_DESC 8
@@ -16,6 +17,9 @@
 #define E1000_STATUS_REGISTER           0x00008
 #define E1000_EEPROM_REGISTER           0x00014
 #define E1000_CTRL_EXT_REGISTER         0x00018
+
+// Interrupt Cause Register
+#define E1000_ICR                       0x000c0
 
 // Interrupt Mask/Set Register
 #define E1000_IMS                       0x000d0
@@ -26,6 +30,7 @@
 #define E1000_RDLEN                     0x02808
 #define E1000_RDH                       0x02810
 #define E1000_RDT                       0x02818
+#define E1000_RDTR                      0x02820
 
 #define E1000_TCTL                      0x00400
 #define E1000_TIPG                      0x00410
@@ -41,6 +46,8 @@
 #define E1000_RAH                       0x05404
 
 
+// Receive Timer Interrupt (p.312)
+#define E1000_INT_RXT0                  (1 << 7)
 
 /* Straight up copied from ToaruOS. */
 // TODO: only use the ones we need. 
@@ -241,8 +248,8 @@ pci_device get_e1000() {
 
     cmd_reg = pci_get_command(e1000.bdf);
 
+    // evalutes to 43 on qemu
     e1000.interrupt = pci_get_interrupt_line(e1000.bdf);
-
 
     // evaluates to 0xfebc0000 on qemu
     e1000.bar0 = pci_get_bar0(e1000.bdf) & 0xfffffff0;
@@ -336,7 +343,12 @@ void initialize_e1000() {
     }
 
     // 3. program the IMS register (interrupt mask)
-    pci_reg_write(E1000_IMS, 0); 
+    // to receive interrupts for packet reception
+    // set the packet timer to 0, so the interrupt fires 
+    // immediately. 
+    pci_reg_write(E1000_IMS, E1000_INT_RXT0); 
+    pci_reg_write(E1000_RDTR, 0);
+
 
     // 4. allocate memory for receive descriptor list. 
     // program RDBAL with the address of this region.
@@ -403,6 +415,11 @@ void update_rxi() {
     rx_i++; if (rx_i >= E1000_NUM_RX_DESC) rx_i = 0;
 }
 
+//static uint16_t last_rdh = -1;
+//
+//static inline uint8_t has_new_rxbuf() {
+//    return last_rdh == pci_reg_read(E1000_RDH);
+//}
 
 uint8_t *get_next_rxbuf() {
     while (!(rx_list[rx_i].status & STATUS_DD)) {
@@ -413,21 +430,106 @@ uint8_t *get_next_rxbuf() {
     // "consume" this entry
     rx_list[rx_i].status = 0;
     update_rxi();
-
+//    last_rdh = pci_reg_read(E1000_RDH);
 
     return buf;
 }
 
-// TODO: would be GREAT to have an interrupt
-// that copies to virtual memory right away when a packet is received
-// or when the descriptor list is full...?
-eth_pkt recv_eth_from_e1000() {
-    uint8_t *buf = get_next_rxbuf();
+/* TODO: this is very temporary. 
+ * it will be replaced by mbufs very soon.
+ * as well as proper protocol queues. */
+typedef struct _epkt_buf {
+    struct _epkt_buf *next_ebuf;
+    struct _epkt_buf *prev_ebuf;
+    eth_pkt data;
+} epkt_buf;
 
-    // dereference + copy so we don't lose the packet. 
-    eth_pkt ret = *((eth_pkt *) buf);
+static epkt_buf *ebuf_head = NULL;
+static epkt_buf *ebuf_tail = NULL;
+
+epkt_buf *ebuf_alloc() {
+    epkt_buf *ebuf = (epkt_buf *) kmalloc(sizeof(epkt_buf));
+
+    ebuf->next_ebuf = NULL;
+
+    if (ebuf_head == NULL) {
+        ebuf->prev_ebuf = NULL;
+        ebuf_head = ebuf;
+        ebuf_tail = ebuf;
+    } else {
+        ebuf_tail->next_ebuf = ebuf;
+        ebuf->prev_ebuf = ebuf_tail;
+        ebuf_tail = ebuf; 
+    }
+
+    return ebuf;
+}
+
+void ebuf_free(epkt_buf *ebuf) {
+    if (ebuf == NULL) return;
+
+    if (ebuf->prev_ebuf == NULL) {
+        // this ebuf is the head. 
+        if (ebuf->next_ebuf == NULL) {
+            // this ebuf is the only ebuf
+            ebuf_head = NULL;
+            ebuf_tail = NULL;
+        }
+        ebuf_head = ebuf->next_ebuf;
+        ebuf_head->prev_ebuf = NULL;
+    } else if (ebuf->next_ebuf == NULL) {
+        // this ebuf is the tail.
+        ebuf_tail = ebuf->prev_ebuf;
+        ebuf_tail->next_ebuf = NULL;
+    }
+
+    kfree(ebuf);
+}
+
+eth_pkt recv_eth_from_e1000() {
+    // TODO: this is bad, since it involves 
+    // some extra data copies of a large 
+    // ethernet packet. 
+
+    // wait until a packet is ready to be received.
+    while (ebuf_head == NULL) { }
+
+    eth_pkt ret = ebuf_head->data;
+
+    ebuf_free(ebuf_head);
 
     return ret;
+}
+
+
+void copy_to_ebuf_chain(eth_pkt *pkt) {
+    // allocate a new member of the chain
+    epkt_buf *ebuf = ebuf_alloc();
+
+    ebuf->data = *pkt;
+
+}
+
+__attribute__ ((interrupt)) 
+void e1000_interrupt(struct interrupt_frame *frame) {
+    asm volatile ("cli");
+
+    // read Interrupt Cause Register to clear the interrupt.
+    // (13.14.17, p.307)
+    uint32_t icr = pci_reg_read(E1000_ICR);
+
+    if (icr & E1000_INT_RXT0) {
+        // new packet
+        uint8_t *buf = get_next_rxbuf();
+
+        // dereference + copy to the packet chain (in vmem)
+        copy_to_ebuf_chain((eth_pkt *) buf); 
+    }
+
+    port_byte_out(PIC2A, PIC_EOI);
+    port_byte_out(PIC1A, PIC_EOI);
+
+    asm volatile ("sti");
 }
 
 

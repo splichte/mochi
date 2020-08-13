@@ -15,8 +15,11 @@ void timer_handler(struct interrupt_frame *frame);
 void transmit_initialization();
 void test_transmit();
 
+__attribute__ ((interrupt)) 
+void e1000_interrupt(struct interrupt_frame *frame);
 
 // virtual memory
 __attribute__ ((interrupt))
 void page_fault_handler(struct interrupt_frame *frame, uint32_t error_code);
+
 

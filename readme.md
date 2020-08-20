@@ -117,6 +117,4 @@ Wikipedia's pages for the network protocol headers -- Ethernet, IP, UDP, are ser
 
 ### W. Richard Stevens - TCP/IP Illustrated, [Volume 1: The Protocols](https://www.amazon.com/TCP-Illustrated-Vol-Addison-Wesley-Professional/dp/0201633469/ref=sr_1_2?dchild=1&keywords=w+richard+stevens+tcp+ip&qid=1597941357&sr=8-2) and [Volume 2: The Implementation](https://www.amazon.com/TCP-IP-Illustrated-Implementation-Vol/dp/020163354X/ref=sr_1_3?dchild=1&keywords=w+richard+stevens+tcp+ip&qid=1597941330&sr=8-3)
 
-Great books. I used the originals from the '90s, which are still available used on Amazon. Volume 2 seems forboding at first, but the sections on memory buffers and protocol buffers were really illuminating to me. It's really interesting to see how much higher-level language features like object methods 
-
-### 
+Great books. I used the originals from the '90s, which are still available used on Amazon. Volume 2 seems forboding at first, but the sections on memory buffers and protocol buffers were really illuminating to me. It's really interesting to see how much higher-level language features like object methods, private fields, and generics can be implemented with primitive C features like function pointers, file-local static storage, and fancy preprocessor macros. Robert Love's book *Linux Kernel Development* goes into great detail on this idea as well.

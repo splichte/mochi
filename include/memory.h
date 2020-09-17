@@ -20,7 +20,3 @@ void setup_memory();
 
 uint8_t map_free_page();
 
-/* memory management functions */
-//void *kmalloc(uint32_t size);
-//void kfree(void *p);
-

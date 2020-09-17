@@ -23,8 +23,6 @@ typedef struct _process {
     timeslice_t ts; // how much ts increments do we give this process?
     uint16_t subtick_start;
 
-
-
     // doubly-linked circular list
     struct _process *prev;
     struct _process *next;

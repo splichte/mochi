@@ -74,7 +74,6 @@ void send_dhcp_discover() {
     dm.htype = 0x01;
     dm.op = 0x01;
     dm.xid = hton(0x3903f326);
-    // I'm sending "no broadcast". it's not receiving?
 
     memmove(dm.chaddr, MAC_ADDR_ARR, 6); 
 

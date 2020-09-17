@@ -7,7 +7,6 @@
 // #define MAC_ADDR 0x82 // from debugging output of qemu.
 
 
-// is this right? or is it the other way around?
 extern uint8_t MAC_ADDR_ARR[6]; 
 
 // little-endian

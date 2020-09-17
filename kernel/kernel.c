@@ -75,17 +75,11 @@ void test_image_persists() {
 //    disk_write(lba, out_buf, 512);
 }
 
-//void test_memory() {
-//    uint32_t *p;
-//    p = (uint32_t *) kmalloc(20);
-//    if (p == NULL) {
-//        print("uh oh!\n");
-//    }
-//}
-
 extern pid_t fork();
 
 int kmain() {
+    // NOTE: this is basically where the kernel starts "properly". 
+    // so right now, there's a lot of testing functionality...
     notify_screen_mmu_on();
     clear_screen();
 
@@ -96,38 +90,20 @@ int kmain() {
     setup_interrupt_controller();
     setup_interrupt_descriptor_table();
 
-//    test_sb_writes();
-
     print("Welcome to Mochi ^_^ \n");
     print(">");
 
-//    mkfs(8, 24);
-
-//    test_fs();
+    mkfs(8, 24);
+    test_fs();
 
     initialize_e1000();
     dhcp_bootstrap_ip();
 
-    // test processes.
-//    init_root_process();
-
-//    pid_t pid = fork();
-
-//    if (pid == 1) {
-//        print("entered 1!\n");
-//        while (1) {
-//        }
-//    }
-//
-//    if (pid == 2) {
-//        print("entered 2!\n");
-//        while (1) {
-//        }
-//    }
-
+    // hang out for a while. 
     while (1) {
 
     }
+
     return 0;
 }
 

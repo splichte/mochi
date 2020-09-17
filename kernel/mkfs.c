@@ -143,7 +143,6 @@ void mkfs(uint32_t mb_start, uint32_t len) {
     // write backup bgdt
     write_bgdt(write_addr + SECTORS_PER_BLOCK_GROUP, to_write_bgdt);
 
-    // this should be in finish_fs_init..
     finish_fs_init(mb_start);
 }
 

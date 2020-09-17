@@ -1,5 +1,3 @@
-; should be an "org" here, I think. 
-
 [org 0x1000] ; matching NEXT_BLOCK_OFFSET in boot_sect.asm
 [bits 16]
 BOOTLOADER_OFFSET   equ 0x2000

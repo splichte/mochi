@@ -25,7 +25,6 @@ int send_pkt_to_udp(uint8_t *pkt, uint16_t len, uint16_t src_port, uint16_t dst_
     memmove(udp_pkt, &udp, sizeof(udp_hdr));
     memmove(udp_pkt + sizeof(udp_hdr), pkt, len);
 
-    // send
     return send_pkt_to_ip(udp_pkt, udp_pkt_len, IP_PROTOCOL_UDP);
 }
 

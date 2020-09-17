@@ -1,3 +1,5 @@
+/* the timer is turned off right now. */
+
 #include "screen.h"
 #include "hardware.h"
 #include "interrupts.h"

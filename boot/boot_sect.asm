@@ -5,10 +5,8 @@
 [bits 16]
 NEXT_BLOCK_OFFSET equ 0x1000    ; memory offset where we'll load next block
 
-    ; ?? isn't this moving into [0]? 
     mov [BOOT_DRIVE], dl
 
-    ; do we need to do this? 
     mov bp, 0x9000
     mov sp, bp
 

@@ -1,3 +1,5 @@
+/* process.c is unfinished. it's just a sketch of ideas. */
+
 #include "process.h"
 #include "memory.h"
 #include "screen.h"

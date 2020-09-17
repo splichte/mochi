@@ -1,3 +1,6 @@
+/* memory.c deals with "raw" RAM, not with kernel memory allocators.
+ * for those allocators, look at kalloc.*/
+
 #include "memory.h"
 #include "hardware.h"
 #include "screen.h"
@@ -27,16 +30,6 @@
 #define N_FREE_PAGES    (MEMORY_LIMIT - FREE_START) / PAGE_SIZE
 
 // for 128Mb, the above value is 0x4C00, or 19456
-
-// ...wait. this is DEFINITELY going to require more virtual pages
-// to be mapped :/
-
-// if we're using 100kb rofl
-// so annoy
-
-
-// turning ppages on causes some BSS issue with objdump...
-// probably our script is breaking it hehe
 
 // this takes up sizeof(physical_page) * 19456 bytes -- about 100Kb. 
 static physical_page ppages[N_FREE_PAGES];

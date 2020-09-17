@@ -173,8 +173,7 @@ void setup_vmem() {
 // pretty good. 
 // kernel.bin is 17kb right now. 
 // 1024 or so is reasonable. 
-// 16384 starts to take a while...
-// like, longer than I think it should.
+// 16384 starts to take a while...why?
 //
 #define SECTORS_TO_READ 1024
 

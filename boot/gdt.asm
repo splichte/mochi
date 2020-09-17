@@ -1,4 +1,4 @@
-; page 36, Entering 32-bit protected mode
+; Blundell page 36, Entering 32-bit protected mode
 gdt_start:
 
 gdt_null:

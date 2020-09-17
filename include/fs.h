@@ -225,9 +225,6 @@ typedef struct {
 // given a "path", print the file contents
 void cat(char *path);
 
-// how to "make" a new file"?
-// I want to open a file for writing.
-
 int mkdir(char *pathname);
 int rmdir(char *pathname);
 
@@ -248,8 +245,6 @@ typedef struct {
 
 // the "file table" (more of a linked list than a table.)
 typedef struct _ft {
-    // inode? something to implement the standard streams.
-    //
     int fd; // the number associated with this file descriptor.
     struct _ft *next;
     struct _ft *prev;
@@ -258,11 +253,5 @@ typedef struct _ft {
 
 /* the following are from the Linux manpages.*/
 int open(const char *pathname, int flags);
-
-/* "read() attempts to read up to *count* bytes 
- * from file descriptor *fd* into the buffer starting 
- * at *buf*.
- */
-//ssize_t read(int fd, void *buf, size_t count);
 
 

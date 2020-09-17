@@ -65,9 +65,8 @@ uint32_t first_free_bm(uint8_t *bitmap, uint8_t allowed_start) {
     for (int j = first_val; j < S_BLOCK_SIZE; j++) {
         uint8_t bmj = bitmap[j];
         if (bmj == 255) continue; // everything filled...
-        // something is not filled! figure out which bit is is.
         // TODO: remember that this is little-endian. might be doing this 
-        // backwards.
+        // backwards (compared to an official implementation)
         uint8_t match;
         for (int k = 0; k < 8; k++) {
             if (((bmj >> k) & 1) == 0) {
@@ -275,10 +274,9 @@ void update_block_bg_desc(uint32_t free_block_n) {
 inode_t new_dir_inode() {
     inode_t new_inode;
     new_inode.i_mode = EXT2_S_IFDIR;
-    new_inode.i_links_count = 1; // 1 or 0?
+    new_inode.i_links_count = 1;
     new_inode.i_blocks = 0; 
     new_inode.i_links_count = 1;
-//    new_inode.i_block[0] = free_block_n;
     new_inode.i_file_acl = 0;
     new_inode.i_dir_acl = 0;
     new_inode.i_faddr = 0;
@@ -325,9 +323,6 @@ void set_bgdt() {
     // if we have < (1024 / 32) block groups
     // (which we do)
     disk_read_blk(bgdt_start_blkno, buf);
-
-    // TODO: fill this out
-//    bgdt = (uint8_t *) kcalloc(n_block_groups, sizeof(bgdesc_t));
 
     // copy into bgdt
     uint8_t *bgdt_buf = (uint8_t *) bgdt;
@@ -537,8 +532,6 @@ int chdir(mochi_file current_dir, const char *name, mochi_file *ret_dir) {
             return -1;
         }
 
-        // this is weird, since there aren't all these entries in block.
-        // seems like the "usr" dentry wasn't added!
         for (int i = 0; i < dentries_per_blk; i++) {
             dentry_t d = dentries[i];
             if (!strcmp(d.name, name)) {
@@ -607,13 +600,9 @@ int add_dentry_to_new_block(mochi_file dir, dentry_t d) {
 int add_dentry(mochi_file dir, dentry_t d) {
     // find the insert point
     inode_t inode = dir.inode;
-
-    // this inode is not getting the "updated" 
-    // root directory, for some reason...
-    // when we do "get_inode" it's correct!
+    
     uint16_t block_len = i_block_len(inode);
 
-    // no block assigned to directory yet?
     if (block_len == 0) {
         return add_dentry_to_new_block(dir, d);
     }
@@ -733,7 +722,7 @@ int create_test_file() {
     uint32_t data_block_n = root.inode.i_block[0];
 
     // TODO: fix disk_write_blk
-    // so we don't have to read the whole dumb thing
+    // so we don't have to read the whole thing
     disk_write_bn(data_block_n, (uint8_t *) &d, sizeof(d));
 
     // write the data (finally) to the actual file!
@@ -755,7 +744,6 @@ int create_test_file() {
 // this is just a test.
 void print_file(const char *fn) {
     mochi_file root = get_root_dir();
-//    inode_t root = get_root_dir_inode();
     // read from directory
     uint32_t data_block_n = root.inode.i_block[0];
 

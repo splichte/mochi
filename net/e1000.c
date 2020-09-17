@@ -240,7 +240,7 @@ pci_device get_e1000() {
         print("not found\n");
         return e1000;
     }
-    // enable bus mastering
+    // enable "bus mastering"
     uint16_t cmd_reg = pci_get_command(e1000.bdf);
     cmd_reg |= (1 << 2); // from toaru
     cmd_reg |= (1 << 0); // from toaru
@@ -400,8 +400,6 @@ void send_eth_to_e1000(const eth_pkt *ep) {
 
     pkt.cmd = CMD_RS | CMD_RPS | CMD_EOP;
 
-    // FIXME: track the current index. maintain the positioning of the queue.
-    // send packet
     ring_buf[tx_i] = pkt;
 
     pci_reg_write(E1000_TDT, tx_i + 1);
